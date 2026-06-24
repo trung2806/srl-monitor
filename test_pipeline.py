@@ -51,31 +51,37 @@ def test_fetcher_sends_canonical_control_command():
 
 def test_pipeline_on_real_capture_bytes_through_evaluate():
     """fetch(mock bytes thật) -> evaluate. Temperature do alarm-status lái (vendor),
-    memory BREACH do ngưỡng demo sát (29>25), cpu OK. Đây là contract fetcher↔monitor."""
+    memory BREACH do ngưỡng demo sát (mem>25), cpu OK. Đây là contract fetcher↔monitor."""
+    cap = json.loads(REAL_BYTES)
+    cpu_all = next(c for c in cap["cpu"] if c["index"] == "all")
     report = run_pipeline(FakeNetmiko(REAL_BYTES))
     m = report["metrics"]
-    assert m["temperature"] == {"value": 50, "status": "OK",
-                                "basis": "alarm-status", "margin": 25}
+    assert m["temperature"]["value"] == cap["temperature"]["instant"]
+    assert m["temperature"]["status"] == "OK" and m["temperature"]["basis"] == "alarm-status"
+    assert m["temperature"]["margin"] == cap["temperature"]["margin"]
     assert m["memory"]["status"] == "BREACH" and m["memory"]["basis"] == "threshold"
-    assert m["cpu"]["value"] == 2 and m["cpu"]["status"] == "OK"
+    assert m["cpu"]["value"] == cpu_all["total"]["average-1"] and m["cpu"]["status"] == "OK"
 
 
 def test_pipeline_render_reaches_dashboard_string():
     """End-to-end tới tận chuỗi màn hình: nhãn basis + dòng margin hiện đúng."""
+    cap = json.loads(REAL_BYTES)
     text = main.render(run_pipeline(FakeNetmiko(REAL_BYTES)))
     assert "SR LINUX MONITORING DASHBOARD" in text
     assert "TEMPERATURE" in text and "(alarm-status)" in text
     assert "MEMORY" in text and "BREACH" in text
-    assert "TEMP MARGIN" in text and "25" in text
+    assert "TEMP MARGIN" in text and str(cap["temperature"]["margin"]) in text
 
 
 def test_pipeline_unwraps_single_element_list_envelope():
     """'... | as json' có path bọc object trong list 1 phần tử. Unwrap phòng thủ
-    phải cho metrics y hệt flat dict. (Envelope thật vẫn nợ verify trên device.)"""
-    wrapped = json.dumps([json.loads(REAL_BYTES)])
+    phải cho metrics y hệt flat dict."""
+    cap = json.loads(REAL_BYTES)
+    cpu_all = next(c for c in cap["cpu"] if c["index"] == "all")
+    wrapped = json.dumps([cap])
     report = run_pipeline(FakeNetmiko(wrapped))
-    assert report["metrics"]["temperature"]["value"] == 50
-    assert report["metrics"]["cpu"]["value"] == 2
+    assert report["metrics"]["temperature"]["value"] == cap["temperature"]["instant"]
+    assert report["metrics"]["cpu"]["value"] == cpu_all["total"]["average-1"]
 
 
 # --- error paths: lỗi fetch short-circuit pipeline, evaluate không chạy ---

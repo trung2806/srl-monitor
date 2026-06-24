@@ -39,7 +39,7 @@ def test_fetch_then_parse_on_REAL_bytes():
 def test_fetch_unwraps_single_element_list():
     real_obj = json.loads((_HERE / "control_A.json").read_text())
     raw = SRLCliFetcher(_ssh_returning(json.dumps([real_obj]))).fetch_control()
-    assert raw["temperature"]["instant"] == 50
+    assert raw["temperature"]["instant"] == real_obj["temperature"]["instant"]
  
  
 def test_fetch_raises_on_cli_error_text():
