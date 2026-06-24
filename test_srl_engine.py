@@ -5,11 +5,13 @@ from srl_engine import (parse_cpu_utilization, parse_memory_utilization,
  
  
 # --- real-shape: chạy trên capture device thật (conftest.control_capture) ---
- 
 def test_parsers_on_real_capture(control_capture):
-    assert parse_cpu_utilization(control_capture) == 2     # total.average-1 của index=all
-    assert parse_memory_utilization(control_capture) == 29
-    assert parse_temperature(control_capture) == 50
+    # derive kỳ vọng từ chính fixture: pin parser rút ĐÚNG field, không pin giá trị trôi
+    cap = control_capture
+    all_cpu = next(c for c in cap["cpu"] if c["index"] == "all")
+    assert parse_cpu_utilization(cap) == all_cpu["total"]["average-1"]
+    assert parse_memory_utilization(cap) == cap["memory"]["utilization"]
+    assert parse_temperature(cap) == cap["temperature"]["instant"]
  
  
 # --- cpu: list per-core, aggregate index=all, chọn average-1 ---

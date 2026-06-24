@@ -19,18 +19,20 @@ def test_fetch_sends_the_exact_capture_command():
     ssh = _ssh_returning("{}")
     SRLCliFetcher(ssh).fetch_control()
     ssh.send_command.assert_called_once_with("info from state platform control A | as json")
- 
- 
+
 def test_fetch_then_parse_on_REAL_bytes():
     """End-to-end trên bytes THẬT: feed nguyên control_A.json device đã trả,
     qua fetcher rồi evaluate_metrics. Không bịa shape."""
     real_bytes = (_HERE / "control_A.json").read_text()
+    cap = json.loads(real_bytes)
     raw = SRLCliFetcher(_ssh_returning(real_bytes)).fetch_control()
     out = evaluate_metrics(raw, {"cpu": 80, "memory": 80})
     m = out["metrics"]
-    assert m["cpu"]["value"] == 2          # list/index=all/average-1, KHÔNG phải {"total": N}
-    assert m["memory"]["value"] == 29
-    assert m["temperature"]["value"] == 50
+    all_cpu = next(c for c in cap["cpu"] if c["index"] == "all")
+    # derive từ fixture: pin cpu=index'all'.average-1 (KHÔNG phải {"total":N}), không pin số trôi
+    assert m["cpu"]["value"] == all_cpu["total"]["average-1"]
+    assert m["memory"]["value"] == cap["memory"]["utilization"]
+    assert m["temperature"]["value"] == cap["temperature"]["instant"]
     assert m["temperature"]["basis"] == "alarm-status"
  
  
