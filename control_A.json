@@ -1,0 +1,1469 @@
+{
+  "slot": "A",
+  "type": "imm48-25g-sfp28+8-100g-qsfp28+2-10g-sfpp",
+  "oper-state": "up",
+  "last-booted": "2026-06-16T01:19:02.776Z (8 days ago)",
+  "last-booted-reason": "critical-error",
+  "last-change": "2026-06-16T01:19:02.776Z (8 days ago)",
+  "part-number": "Sim Part No.",
+  "removable": false,
+  "clei-code": "Sim CLEI",
+  "serial-number": "Sim Serial No.",
+  "software-version": "v26.3.2-426-g2b38957bbca",
+  "locator-state": "inactive",
+  "bootloader": {
+    "manufacturer": "GNU",
+    "software-version": "Sim bootloader"
+  },
+  "bios": {
+    "manufacturer": "Microsoft Corporation",
+    "software-version": "Hyper-V UEFI Release v4.1"
+  },
+  "interface": [
+    {
+      "name": "usb",
+      "admin-state": "enable"
+    }
+  ],
+  "temperature": {
+    "instant": 50,
+    "maximum": 50,
+    "maximum-time": "2026-06-16T01:19:03.535Z (8 days ago)",
+    "alarm-status": false,
+    "margin": 25
+  },
+  "forwarding-plane": {
+    "fib-table": {
+      "programming-progress": {
+        "ip-routes": {
+          "entries-remaining-to-add": "0",
+          "entries-remaining-to-modify": "0",
+          "last-sync-time": "2026-06-16T01:19:14.288Z (8 days ago)"
+        },
+        "next-hop-groups": {
+          "entries-remaining-to-add": "0",
+          "entries-remaining-to-modify": "0",
+          "last-sync-time": "2026-06-16T01:19:14.288Z (8 days ago)"
+        },
+        "tunnels": {
+          "entries-remaining-to-add": "0",
+          "entries-remaining-to-modify": "0",
+          "last-sync-time": "2026-06-16T01:19:08.160Z (8 days ago)"
+        }
+      }
+    },
+    "datapath": {
+      "xdp": {
+        "resource": [
+          {
+            "name": "arp-nd-entries",
+            "used-percent": 0,
+            "used-entries": 3,
+            "free-entries": 40957
+          },
+          {
+            "name": "direct-ip-next-hops",
+            "used-percent": 0,
+            "used-entries": 2,
+            "free-entries": 16382
+          },
+          {
+            "name": "ecmp-groups",
+            "used-percent": 0,
+            "used-entries": 0,
+            "free-entries": 49150
+          },
+          {
+            "name": "ecmp-members",
+            "used-percent": 0,
+            "used-entries": 0,
+            "free-entries": 138750
+          },
+          {
+            "name": "indirect-ip-next-hops",
+            "used-percent": 0,
+            "used-entries": 0,
+            "free-entries": 16384
+          },
+          {
+            "name": "ip-hosts",
+            "used-percent": 0,
+            "used-entries": 6,
+            "free-entries": 147450
+          },
+          {
+            "name": "mac-addresses",
+            "used-percent": 0,
+            "used-entries": 0,
+            "free-entries": 156000
+          },
+          {
+            "name": "mac-next-hops",
+            "used-percent": 0,
+            "used-entries": 0,
+            "free-entries": 10240
+          },
+          {
+            "name": "originating-tunnels",
+            "used-percent": 0,
+            "used-entries": 0,
+            "free-entries": 3840
+          },
+          {
+            "name": "tunnel-next-hops",
+            "used-percent": 0,
+            "used-entries": 0,
+            "free-entries": 16384
+          }
+        ]
+      }
+    },
+    "tcam": {
+      "resource": [
+        {
+          "name": "if-input-ipv4",
+          "free": 8960,
+          "reserved": 0,
+          "programmed": 0
+        },
+        {
+          "name": "if-input-ipv6",
+          "free": 4352,
+          "reserved": 0,
+          "programmed": 0
+        },
+        {
+          "name": "policy-forwarding-nhg-ipv4",
+          "free": 6912,
+          "reserved": 0,
+          "programmed": 0
+        },
+        {
+          "name": "policy-forwarding-nhg-ipv6",
+          "free": 2304,
+          "reserved": 0,
+          "programmed": 0
+        }
+      ]
+    }
+  },
+  "healthz": {
+    "status": "healthy"
+  },
+  "cpu": [
+    {
+      "index": "all",
+      "architecture": "aarch64",
+      "type": "Oryon",
+      "speed": "0.00",
+      "total": {
+        "instant": 2,
+        "average-1": 2,
+        "average-5": 2,
+        "average-15": 2
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 1,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 98,
+        "average-1": 98,
+        "average-5": 98,
+        "average-15": 98
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "0",
+      "total": {
+        "instant": 2,
+        "average-1": 2,
+        "average-5": 2,
+        "average-15": 1
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 98,
+        "average-1": 98,
+        "average-5": 98,
+        "average-15": 99
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "1",
+      "total": {
+        "instant": 2,
+        "average-1": 2,
+        "average-5": 2,
+        "average-15": 2
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 1,
+        "average-1": 1,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 98,
+        "average-1": 98,
+        "average-5": 98,
+        "average-15": 98
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "2",
+      "total": {
+        "instant": 3,
+        "average-1": 2,
+        "average-5": 2,
+        "average-15": 2
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 2,
+        "average-1": 1,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 97,
+        "average-1": 98,
+        "average-5": 98,
+        "average-15": 98
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "3",
+      "total": {
+        "instant": 5,
+        "average-1": 2,
+        "average-5": 2,
+        "average-15": 2
+      },
+      "user": {
+        "instant": 2,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 1,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 95,
+        "average-1": 98,
+        "average-5": 98,
+        "average-15": 98
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "4",
+      "total": {
+        "instant": 2,
+        "average-1": 2,
+        "average-5": 1,
+        "average-15": 1
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 98,
+        "average-1": 98,
+        "average-5": 99,
+        "average-15": 99
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "5",
+      "total": {
+        "instant": 2,
+        "average-1": 2,
+        "average-5": 2,
+        "average-15": 2
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 1,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 98,
+        "average-1": 98,
+        "average-5": 98,
+        "average-15": 98
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "6",
+      "total": {
+        "instant": 2,
+        "average-1": 1,
+        "average-5": 2,
+        "average-15": 1
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 1,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 98,
+        "average-1": 99,
+        "average-5": 98,
+        "average-15": 99
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "7",
+      "total": {
+        "instant": 1,
+        "average-1": 2,
+        "average-5": 1,
+        "average-15": 1
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 99,
+        "average-1": 98,
+        "average-5": 99,
+        "average-15": 99
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "8",
+      "total": {
+        "instant": 2,
+        "average-1": 2,
+        "average-5": 1,
+        "average-15": 1
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 1,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 98,
+        "average-1": 98,
+        "average-5": 99,
+        "average-15": 99
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    },
+    {
+      "index": "9",
+      "total": {
+        "instant": 2,
+        "average-1": 4,
+        "average-5": 2,
+        "average-15": 2
+      },
+      "user": {
+        "instant": 0,
+        "average-1": 1,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "system": {
+        "instant": 1,
+        "average-1": 1,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "nice": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "idle": {
+        "instant": 98,
+        "average-1": 96,
+        "average-5": 98,
+        "average-15": 98
+      },
+      "iowait": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "hardware-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      },
+      "software-interrupt": {
+        "instant": 0,
+        "average-1": 0,
+        "average-5": 0,
+        "average-15": 0
+      }
+    }
+  ],
+  "process": [
+    {
+      "pid": "1",
+      "name": "tini",
+      "start-time": "2026-06-20T17:44:01.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "1073152",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "7",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:01.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "16171008",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "130",
+      "name": "sshd",
+      "start-time": "2026-06-20T17:44:02.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "2732032",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "1658",
+      "name": "sr_supportd",
+      "start-time": "2026-06-20T17:44:07.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "43225088",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "1708",
+      "name": "top",
+      "start-time": "2026-06-20T17:44:08.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "17596416",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "1902",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:09.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3911680",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "1903",
+      "name": "sr_linux",
+      "start-time": "2026-06-20T17:44:09.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3407872",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "1914",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:09.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "16150528",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "1916",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:09.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3907584",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "1917",
+      "name": "runuser",
+      "start-time": "2026-06-20T17:44:09.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "14995456",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "1959",
+      "name": "sr_linux",
+      "start-time": "2026-06-20T17:44:09.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3395584",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "2182",
+      "name": "sr_app_mgr",
+      "start-time": "2026-06-20T17:44:09.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "104210432",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2242",
+      "name": "sr_device_mgr",
+      "start-time": "2026-06-20T17:44:10.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "194293760",
+      "memory-utilization": 2
+    },
+    {
+      "pid": "2310",
+      "name": "sr_idb_server",
+      "start-time": "2026-06-20T17:44:10.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "82792448",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2350",
+      "name": "sr_sflow_sample_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "110039040",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2371",
+      "name": "sr_acl_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "109740032",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2408",
+      "name": "sr_log_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "102666240",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2445",
+      "name": "sr_license_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "98873344",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2484",
+      "name": "sr_net_inst_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "109367296",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2521",
+      "name": "sr_dhcp_client_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "100810752",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2565",
+      "name": "sr_mfib_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "102400000",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2603",
+      "name": "sr_fib_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "119488512",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2631",
+      "name": "sr_radius_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "111468544",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2663",
+      "name": "sr_evpn_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "112828416",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2714",
+      "name": "sr_chassis_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "124178432",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2762",
+      "name": "sr_mcid_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "103165952",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2805",
+      "name": "sr_stat_id_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "97353728",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2833",
+      "name": "sr_linux_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "125407232",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2877",
+      "name": "sr_l2_mac_learn_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "101928960",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2909",
+      "name": "sr_lag_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "104480768",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "2956",
+      "name": "sr_arp_nd_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "142299136",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3010",
+      "name": "sr_index_res_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "97579008",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3045",
+      "name": "sr_mgmt_server",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "199016448",
+      "memory-utilization": 2
+    },
+    {
+      "pid": "3075",
+      "name": "sr_l2_mac_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "105136128",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3113",
+      "name": "sr_xdp_lc",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 1,
+      "memory-usage": "720338944",
+      "memory-utilization": 8
+    },
+    {
+      "pid": "3165",
+      "name": "sr_bfd_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "112701440",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3206",
+      "name": "sr_aaa_mgr",
+      "start-time": "2026-06-20T17:44:11.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "117379072",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3476",
+      "name": "sr_fhs_mgr",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "121643008",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3495",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "16109568",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3517",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3850240",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3518",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "16183296",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3520",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3846144",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3521",
+      "name": "sr_grpc_server",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "142200832",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3558",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "16121856",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3567",
+      "name": "sr_lldp_mgr",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "115470336",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3587",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "16117760",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3598",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3846144",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3599",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "16191488",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3609",
+      "name": "sr_oc_mgmt_server",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "211640320",
+      "memory-utilization": 2
+    },
+    {
+      "pid": "3633",
+      "name": "sr_plcy_mgr",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "113033216",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3656",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3846144",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3659",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3850240",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3661",
+      "name": "sr_json_rpc",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "103702528",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3667",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "16191488",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3670",
+      "name": "sr_qos_mgr",
+      "start-time": "2026-06-20T17:44:13.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "109629440",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3722",
+      "name": "sr_sdk_mgr",
+      "start-time": "2026-06-20T17:44:14.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "106491904",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3763",
+      "name": "sudo",
+      "start-time": "2026-06-20T17:44:14.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "3846144",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "3770",
+      "name": "sr_netconf_mgr",
+      "start-time": "2026-06-20T17:44:14.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "123674624",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "3774",
+      "name": "sr_vxlan_mgr",
+      "start-time": "2026-06-20T17:44:14.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "101756928",
+      "memory-utilization": 1
+    },
+    {
+      "pid": "4093",
+      "name": "rsyslogd",
+      "start-time": "2026-06-20T17:44:15.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "17231872",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4123",
+      "name": "sr_json_rpc",
+      "start-time": "2026-06-20T17:44:16.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "17125376",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4125",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:16.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "80502784",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4128",
+      "name": "sr_json_rpc",
+      "start-time": "2026-06-20T17:44:16.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "17129472",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4129",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:16.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "80588800",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4252",
+      "name": "dnsmasq",
+      "start-time": "2026-06-20T17:44:16.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "2187264",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4259",
+      "name": "sshd",
+      "start-time": "2026-06-20T17:44:16.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "5242880",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4320",
+      "name": "sshd",
+      "start-time": "2026-06-20T17:44:16.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "2732032",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4329",
+      "name": "sr_snmp_server",
+      "start-time": "2026-06-20T17:44:16.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "46370816",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4368",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:17.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63885312",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4369",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:17.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63885312",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4370",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:17.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4371",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:17.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4372",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:17.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4374",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:17.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4379",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:17.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4380",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4381",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4382",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4383",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4384",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4385",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4386",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4387",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4388",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4389",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4390",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4391",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    },
+    {
+      "pid": "4392",
+      "name": "python3",
+      "start-time": "2026-06-20T17:44:18.000Z (3 days ago)",
+      "cpu-utilization": 0,
+      "memory-usage": "63950848",
+      "memory-utilization": 0
+    }
+  ],
+  "disk": [
+    {
+      "name": "/dev/sda",
+      "model-number": "",
+      "part-number": "NA",
+      "serial-number": "",
+      "size": "419504128",
+      "type": "compactflash",
+      "install-position": "internal"
+    },
+    {
+      "name": "/dev/sdb",
+      "model-number": "",
+      "part-number": "NA",
+      "serial-number": "",
+      "size": "212836352",
+      "type": "compactflash",
+      "install-position": "internal"
+    },
+    {
+      "name": "/dev/sdc",
+      "model-number": "",
+      "part-number": "NA",
+      "serial-number": "",
+      "size": "2147487744",
+      "type": "compactflash",
+      "install-position": "internal"
+    },
+    {
+      "name": "/dev/sdd",
+      "model-number": "",
+      "part-number": "NA",
+      "serial-number": "",
+      "size": "1099511627776",
+      "type": "compactflash",
+      "install-position": "internal"
+    }
+  ],
+  "memory": {
+    "physical": "8105684992",
+    "reserved": "2330497024",
+    "free": "5775187968",
+    "utilization": 28
+  }
+}
