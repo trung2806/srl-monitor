@@ -1,6 +1,7 @@
 from typing import Any, Optional
  
-from srl_engine import parse_cpu_utilization, parse_memory_utilization, parse_temperature
+from srl_engine import (parse_cpu_utilization, parse_healthz_status,
+                        parse_memory_utilization, parse_temperature)
 from srl_alert import evaluate_alert
  
 _PARSERS = {
@@ -47,5 +48,19 @@ def evaluate_metrics(raw_json: dict[str, Any], thresholds: Optional[dict[str, in
             entry["status"] = "BREACH" if evaluate_alert(name, value, threshold).breached else "OK"
             entry["basis"] = "threshold"
         metrics[name] = entry
+ 
+    # healthz: module-health do device tự công bố. AUTHORITY-style như alarm-status:
+    # KHÔNG threshold, phán quyết của device là cơ sở. Fail-safe: CHỈ đúng chuỗi 'healthy'
+    # mới OK; mọi trạng thái khác (degraded, unknown, future, ...) -> BREACH, không bao
+    # giờ bịa OK cho trạng thái lạ. OPTIONAL: device/cũ không trả healthz -> bỏ qua (không
+    # có tín hiệu, không bịa entry), khớp triết lý NO_THRESHOLD. Status thật surface vào
+    # 'value' để operator thấy ĐÚNG trạng thái nào, song song margin của alarm-status.
+    if raw_json.get("healthz") is not None:
+        health_status = parse_healthz_status(raw_json)
+        metrics["healthz"] = {
+            "value": health_status,
+            "status": "OK" if health_status == "healthy" else "BREACH",
+            "basis": "healthz",
+        }
  
     return {"metrics": metrics}

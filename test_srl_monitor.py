@@ -62,3 +62,40 @@ def test_temperature_no_alarm_no_threshold_is_unchecked():
            "cpu": _CPU_ALL, "memory": {"utilization": 10}}
     out = evaluate_metrics(raw)
     assert out["metrics"]["temperature"]["status"] == "NO_THRESHOLD"
+
+
+# --- Day 33: healthz authority-style (module-health do device công bố) ---
+
+def test_evaluate_includes_healthz_ok_on_real_capture(control_capture):
+    cap = control_capture
+    m = evaluate_metrics(cap)["metrics"]
+    # value derive từ fixture; 'healthy' -> OK, basis healthz (KHÔNG threshold)
+    assert m["healthz"]["value"] == cap["healthz"]["status"]
+    assert m["healthz"]["status"] == "OK"
+    assert m["healthz"]["basis"] == "healthz"
+
+
+def test_healthz_non_healthy_breaches_without_threshold():
+    """Authority: device báo 'degraded' -> BREACH dù KHÔNG có threshold cho healthz."""
+    raw = {"cpu": _CPU_ALL, "memory": {"utilization": 10},
+           "temperature": {"instant": 50},
+           "healthz": {"status": "degraded"}}
+    h = evaluate_metrics(raw)["metrics"]["healthz"]
+    assert h["status"] == "BREACH"
+    assert h["basis"] == "healthz"
+    assert h["value"] == "degraded"          # surface trạng thái lạ, không nuốt
+
+
+def test_healthz_unknown_status_is_breach_not_ok():
+    """Fail-safe: trạng thái không nhận diện KHÔNG được bịa OK."""
+    raw = {"cpu": _CPU_ALL, "memory": {"utilization": 10},
+           "temperature": {"instant": 50},
+           "healthz": {"status": "some-future-state"}}
+    assert evaluate_metrics(raw)["metrics"]["healthz"]["status"] == "BREACH"
+
+
+def test_healthz_absent_is_omitted_not_fabricated():
+    """Device không trả healthz -> KHÔNG có entry healthz (không bịa OK/UNKNOWN)."""
+    raw = {"cpu": _CPU_ALL, "memory": {"utilization": 10},
+           "temperature": {"instant": 50}}
+    assert "healthz" not in evaluate_metrics(raw)["metrics"]

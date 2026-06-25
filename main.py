@@ -27,7 +27,7 @@ def build_report(thresholds: dict[str, int] | None = None) -> dict:
 def render(report: dict) -> str:
     lines = ["=" * 45, f"{'SR LINUX MONITORING DASHBOARD':^45}", "=" * 45]
     for name, data in report["metrics"].items():
-        unit = "°C" if name == "temperature" else "%"
+        unit = "°C" if name == "temperature" else "" if name == "healthz" else "%"
         basis = data.get("basis")
         basis_tag = f"  ({basis})" if basis else ""
         lines.append(

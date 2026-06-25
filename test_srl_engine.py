@@ -1,7 +1,8 @@
 import pytest
  
-from srl_engine import (parse_cpu_utilization, parse_memory_utilization,
-                        parse_temperature, validate_percent_range)
+from srl_engine import (parse_cpu_utilization, parse_healthz_status,
+                        parse_memory_utilization, parse_temperature,
+                        validate_percent_range)
  
  
 # --- real-shape: chạy trên capture device thật (conftest.control_capture) ---
@@ -73,3 +74,29 @@ def test_temperature_accepts_values_outside_percent_range():
     # omission pin both-sides: temperature không kẹp 0-100
     assert parse_temperature({"temperature": {"instant": 130}}) == 130
     assert parse_temperature({"temperature": {"instant": -5}}) == -5
+
+
+# --- healthz: status phạm trù (chuỗi enum), KHÔNG range-check; parser chỉ canh shape ---
+
+def test_parse_healthz_on_real_capture(control_capture):
+    # derive từ fixture: pin parser rút ĐÚNG field, không pin giá trị
+    assert parse_healthz_status(control_capture) == control_capture["healthz"]["status"]
+
+
+def test_healthz_returns_status_string():
+    assert parse_healthz_status({"healthz": {"status": "degraded"}}) == "degraded"
+
+
+def test_healthz_missing_block_raises():
+    with pytest.raises(ValueError, match="has no 'healthz' object"):
+        parse_healthz_status({"cpu": []})
+
+
+def test_healthz_missing_status_raises():
+    with pytest.raises(ValueError, match="missing a non-empty 'status' string"):
+        parse_healthz_status({"healthz": {}})
+
+
+def test_healthz_empty_status_raises():
+    with pytest.raises(ValueError, match="missing a non-empty 'status' string"):
+        parse_healthz_status({"healthz": {"status": "  "}})

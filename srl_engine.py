@@ -41,3 +41,17 @@ def parse_temperature(raw_json: dict[str, Any]) -> int:
     if instant is None:
         raise ValueError("temperature object is missing 'instant' value")
     return int(instant)
+
+
+def parse_healthz_status(raw_json: dict[str, Any]) -> str:
+    """Trạng thái sức khỏe module do device tự công bố (healthz.status): enum chuỗi
+    ('healthy', 'degraded', ...). KHÔNG range-check, KHÔNG ép int (phạm trù, không phải %).
+    Chỉ canh có mặt và là chuỗi không rỗng; phán quyết OK/BREACH thuộc monitor
+    (authority-style, xem evaluate_metrics)."""
+    healthz = raw_json.get("healthz")
+    if not isinstance(healthz, dict):
+        raise ValueError("control object has no 'healthz' object")
+    status = healthz.get("status")
+    if not isinstance(status, str) or not status.strip():
+        raise ValueError("healthz object is missing a non-empty 'status' string")
+    return status
