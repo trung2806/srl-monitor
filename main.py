@@ -1,3 +1,4 @@
+import json
 import time
 import logging
 import sys
@@ -9,7 +10,7 @@ from typing import Dict, Any, List, Tuple
 from srl_monitor import evaluate_metrics
 from srl_cooldown import SystemAlertState, process_all_cooldowns
 
-# --- Cấu hình hệ thống ---
+# --- Cấu hình mặc định nội bộ (Chỉ dùng làm reference hoặc test) ---
 DEFAULT_THRESHOLDS = {
     "cpu": 80,
     "memory": 25,        
@@ -25,17 +26,47 @@ logging.basicConfig(
     ]
 )
 
+# --- [Day 37] TẦNG CONFIGURATION LOADER (IMPERATIVE SHELL / FAIL-FAST) ---
+def load_thresholds(filepath: str) -> Dict[str, int]:
+    """Nạp, parse và kiểm tra tính hợp lệ của file cấu hình JSON chứa các ngưỡng giám sát."""
+    # Bước 1: open + json.load (FileNotFoundError và JSONDecodeError tự propagate)
+    with open(filepath, "r", encoding="utf-8") as f:
+        config = json.load(f)
+        
+    # Bước 2: type check config là dict
+    if not isinstance(config, dict):
+        raise TypeError(f"Cấu hình gốc trong file JSON phải là một dictionary. Nhận được: {type(config).__name__}")
+        
+    # Bước 3: check đủ required keys
+    required_keys = {"cpu", "memory", "temperature"}
+    missing_keys = required_keys - config.keys()
+    if missing_keys:
+        raise ValueError(f"File cấu hình thiếu các key bắt buộc: {', '.join(sorted(missing_keys))}")
+        
+    # Bước 4 & 5: validate từng value và đóng gói subset dữ liệu sạch để return
+    validated_thresholds: Dict[str, int] = {}
+    for key in required_keys:
+        val = config[key]
+        
+        # Kiểm tra kiểu dữ liệu (loại trừ bool vì isinstance(True, int) là True)
+        if not isinstance(val, int) or isinstance(val, bool):
+            raise TypeError(f"Ngưỡng của '{key}' phải là số nguyên (int). Nhận được: {type(val).__name__}")
+            
+        # Kiểm tra ràng buộc logic (temperature có thể > 100 nên chỉ check > 0)
+        if val <= 0:
+            raise ValueError(f"Ngưỡng của '{key}' phải lớn hơn 0. Nhận được: {val}")
+            
+        validated_thresholds[key] = val
+        
+    return validated_thresholds
+
+
 # --- [Day 36] THIẾT KẾ ASYNC-SIGNAL SAFE ---
 _stop_event = threading.Event()
 
 def sigterm_handler(signum: int, frame: Any) -> None:
-    """
-    Handler nguyên tử: TUYỆT ĐỐI KHÔNG I/O, KHÔNG LOGGING.
-    Chỉ giải phóng cờ chờ để bảo đảm an toàn, tránh deadlock lock nội bộ.
-    """
     _stop_event.set()
 
-# Đăng ký bẫy tín hiệu SIGTERM (từ Hệ điều hành / Systemd) và SIGINT (từ Ctrl+C)
 signal.signal(signal.SIGTERM, sigterm_handler)
 signal.signal(signal.SIGINT, sigterm_handler)
 
@@ -79,18 +110,13 @@ def render(report: Dict[str, Any]) -> str:
         status = payload.get("status", "UNKNOWN")
         val = payload.get("value", "N/A")
         basis = payload.get("basis", "")
-        
-        # Format hiển thị kèm basis ngữ cảnh
         basis_str = f" ({basis})" if basis else ""
         lines.append(f"-> {metric.upper()}: status={status} (value={val}){basis_str}")
     
-    # KHÔI PHỤC: Trích xuất hiển thị dòng TEMP MARGIN để vượt qua bộ test kiểm thử cũ
     temp_payload = report.get("metrics", {}).get("temperature", {})
     margin_val = None
     if isinstance(temp_payload, dict):
         margin_val = temp_payload.get("margin")
-        
-    # Dự phòng nếu hệ thống đặt margin ở tầng ngoài của report
     if margin_val is None:
         margin_val = report.get("margin") or report.get("temperature_margin")
         
@@ -123,34 +149,43 @@ def tick(
     return alerts, next_state
 
 
-# --- [Day 36] THE IMPERATIVE SHELL ---
-def main_loop(interval_seconds: int = 2, cooldown_seconds: int = 1):
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor (Day 36)...")
+# --- [Day 36 & 37] THE IMPERATIVE SHELL ---
+def main_loop(
+    interval_seconds: int = 2, 
+    cooldown_seconds: int = 1, 
+    config_path: str = "thresholds.json"
+):
+    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor (Day 37)...")
+    
+    # 1. NẠP VÀ KIỂM TRA CẤU HÌNH ĐẦU VÀO (Fail-Fast)
+    try:
+        current_thresholds = load_thresholds(config_path)
+        logging.info(f"⚙️ Nạp cấu hình thành công từ '{config_path}': {current_thresholds}")
+    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError) as e:
+        logging.critical(f"💥 KHÔNG THỂ KHỞI ĐỘNG: Lỗi cấu hình nghiêm trọng tại file '{config_path}'")
+        logging.critical(f"👉 Chi tiết lỗi: {e}")
+        raise  # Re-raise để đẩy quyền quyết định Exit Code cho entrypoint bọc ngoài
+
+    # 2. KHỞI TẠO TRẠNG THÁI HỆ THỐNG
     state_registry = SystemAlertState()
 
     try:
         while not _stop_event.is_set():
-            # 1. I/O lấy dữ liệu mạng và OS clock
             raw_json = dummy_fetcher()
             now = time.time()
             
-            # 2. Ủy quyền tính toán thuần túy
             alerts, state_registry = tick(
                 raw_data=raw_json,
                 past_state=state_registry,
                 current_time=now,
-                thresholds=DEFAULT_THRESHOLDS,
+                thresholds=current_thresholds,
                 cooldown_seconds=cooldown_seconds
             )
             
-            # 3. I/O Side-effect đẩy cảnh báo
             for alert in alerts:
                 emit_alert(alert)
                 
-            # 4. Ngủ động thông minh qua Event
             is_interrupted = _stop_event.wait(timeout=interval_seconds)
-            
-            # Ghi log an toàn tại Main Thread sau khi bừng tỉnh
             if is_interrupted:
                 logging.warning("🚨 Nhận tín hiệu kích hoạt dừng hệ thống (_stop_event được set).")
                 
@@ -159,10 +194,17 @@ def main_loop(interval_seconds: int = 2, cooldown_seconds: int = 1):
     except Exception as e:
         logging.error(f"💥 Hệ thống gặp lỗi nghiêm trọng bất ngờ: {e}", exc_info=True)
     finally:
-        # Bảo hiểm tối thượng
         _stop_event.set()
         logging.info("🧹 Đang giải phóng tài nguyên hệ thống...")
         logging.info("🛑 SR Linux Monitor daemon stopped cleanly. Exit code 0.")
 
+
 if __name__ == "__main__":
-    main_loop(interval_seconds=2, cooldown_seconds=1)
+    import sys
+    target_config = sys.argv[1] if len(sys.argv) > 1 else "thresholds.json"
+    
+    try:
+        main_loop(interval_seconds=2, cooldown_seconds=1, config_path=target_config)
+    except Exception:
+        # Chính sách Exit Code: Trả về lỗi 1 cho OS/Systemd nếu cấu hình hoặc khởi động fail
+        sys.exit(1)
