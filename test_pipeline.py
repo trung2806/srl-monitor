@@ -63,16 +63,6 @@ def test_pipeline_on_real_capture_bytes_through_evaluate():
     assert m["cpu"]["value"] == cpu_all["total"]["average-1"] and m["cpu"]["status"] == "OK"
 
 
-def test_pipeline_render_reaches_dashboard_string():
-    """End-to-end tới tận chuỗi màn hình: nhãn basis + dòng margin hiện đúng."""
-    cap = json.loads(REAL_BYTES)
-    text = main.render(run_pipeline(FakeNetmiko(REAL_BYTES)))
-    assert "SR LINUX MONITORING DASHBOARD" in text
-    assert "TEMPERATURE" in text and "(alarm-status)" in text
-    assert "MEMORY" in text and "BREACH" in text
-    assert "TEMP MARGIN" in text and str(cap["temperature"]["margin"]) in text
-
-
 def test_pipeline_unwraps_single_element_list_envelope():
     """'... | as json' có path bọc object trong list 1 phần tử. Unwrap phòng thủ
     phải cho metrics y hệt flat dict."""

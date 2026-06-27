@@ -3,20 +3,15 @@ import time
 import logging
 import sys
 import signal
-import threading
+import asyncio
+import asyncssh
 from typing import Dict, Any, List, Tuple
 
-# Import tầng phân tích và trạng thái từ các bài học trước
+# Import tầng phân tích và trạng thái từ cấu trúc của các bài học trước
 from srl_monitor import evaluate_metrics
 from srl_cooldown import SystemAlertState, process_all_cooldowns
 
-# --- Cấu hình mặc định nội bộ (Chỉ dùng làm reference hoặc test) ---
-DEFAULT_THRESHOLDS = {
-    "cpu": 80,
-    "memory": 25,        
-    "temperature": 75
-}
-
+# Cấu hình logging ghi song song ra cả Console stdout và file log để tracking lịch sử
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -26,112 +21,92 @@ logging.basicConfig(
     ]
 )
 
-# --- [Day 37] TẦNG CONFIGURATION LOADER (IMPERATIVE SHELL / FAIL-FAST) ---
+
+# ==============================================================================
+# 1. TẦNG CONFIGURATION LOADER (FAIL-FAST) - [Day 37]
+# ==============================================================================
 def load_thresholds(filepath: str) -> Dict[str, int]:
-    """Nạp, parse và kiểm tra tính hợp lệ của file cấu hình JSON chứa các ngưỡng giám sát."""
-    # Bước 1: open + json.load (FileNotFoundError và JSONDecodeError tự propagate)
+    """Nạp và kiểm tra tính hợp lệ của file cấu hình JSON chứa các ngưỡng giám sát.
+    Tự động nổ lỗi ngay lập tức (Fail-Fast) nếu phát hiện dữ liệu rác hoặc thiếu key.
+    """
     with open(filepath, "r", encoding="utf-8") as f:
         config = json.load(f)
         
-    # Bước 2: type check config là dict
     if not isinstance(config, dict):
-        raise TypeError(f"Cấu hình gốc trong file JSON phải là một dictionary. Nhận được: {type(config).__name__}")
+        raise TypeError(f"Cấu hình gốc phải là một dictionary. Nhận được: {type(config).__name__}")
         
-    # Bước 3: check đủ required keys
     required_keys = {"cpu", "memory", "temperature"}
     missing_keys = required_keys - config.keys()
     if missing_keys:
         raise ValueError(f"File cấu hình thiếu các key bắt buộc: {', '.join(sorted(missing_keys))}")
         
-    # Bước 4 & 5: validate từng value và đóng gói subset dữ liệu sạch để return
     validated_thresholds: Dict[str, int] = {}
     for key in required_keys:
         val = config[key]
-        
-        # Kiểm tra kiểu dữ liệu (loại trừ bool vì isinstance(True, int) là True)
         if not isinstance(val, int) or isinstance(val, bool):
-            raise TypeError(f"Ngưỡng của '{key}' phải là số nguyên (int). Nhận được: {type(val).__name__}")
-            
-        # Kiểm tra ràng buộc logic (temperature có thể > 100 nên chỉ check > 0)
+            raise TypeError(f"Ngưỡng của '{key}' phải là số nguyên. Nhận được: {type(val).__name__}")
         if val <= 0:
             raise ValueError(f"Ngưỡng của '{key}' phải lớn hơn 0. Nhận được: {val}")
-            
         validated_thresholds[key] = val
         
     return validated_thresholds
 
 
-# --- [Day 36] THIẾT KẾ ASYNC-SIGNAL SAFE ---
-_stop_event = threading.Event()
-
-def sigterm_handler(signum: int, frame: Any) -> None:
-    _stop_event.set()
-
-signal.signal(signal.SIGTERM, sigterm_handler)
-signal.signal(signal.SIGINT, sigterm_handler)
-
-
-# --- Bộ sinh dữ liệu giả lập qua dòng thời gian ---
-_LOOP_COUNTER = 0
-def dummy_fetcher() -> Dict[str, Any]:
-    global _LOOP_COUNTER
-    if _LOOP_COUNTER == 0:
-        data = {
-            "cpu": [{"index": "all", "total": {"average-1": 95}}], 
-            "memory": {"utilization": 20},
-            "temperature": {"instant": 45, "alarm-status": False},
-            "healthz": {"status": "healthy"}
-        }
-    elif _LOOP_COUNTER == 1:
-        data = {
-            "cpu": [{"index": "all", "total": {"average-1": 95}}], 
-            "memory": {"utilization": 20},
-            "temperature": {"instant": 45, "alarm-status": False},
-            "healthz": {"status": "healthy"}
-        }
-    else:
-        data = {
-            "cpu": [{"index": "all", "total": {"average-1": 30}}], 
-            "memory": {"utilization": 20},
-            "temperature": {"instant": 45, "alarm-status": False},
-            "healthz": {"status": "healthy"}
-        }
-    _LOOP_COUNTER += 1
-    return data
-
-# --- Tương thích ngược ---
-def build_report(raw_data: Dict[str, Any] = None) -> Dict[str, Any]:
-    data = raw_data or dummy_fetcher()
-    return evaluate_metrics(data, DEFAULT_THRESHOLDS)
-
-def render(report: Dict[str, Any]) -> str:
-    lines = ["\n=== SR LINUX MONITORING DASHBOARD ==="]
-    for metric, payload in report.get("metrics", {}).items():
-        status = payload.get("status", "UNKNOWN")
-        val = payload.get("value", "N/A")
-        basis = payload.get("basis", "")
-        basis_str = f" ({basis})" if basis else ""
-        lines.append(f"-> {metric.upper()}: status={status} (value={val}){basis_str}")
+# ==============================================================================
+# 2. TẦNG TRANSPORT NETWORKING (ASYNCSSH IMPLEMENTATION) - [Day 38]
+# ==============================================================================
+async def poll_node(host: str, username: str = "admin", password: str = "admin") -> Dict[str, Any]:
+    """Mở kết nối SSH bất đồng bộ tới thiết bị, chạy lệnh lấy dữ liệu thô.
+    Đóng vai trò là một Error Boundary bọc lỗi mạng an toàn để không kéo sập Event Loop.
+    """
+    logging.info(f"🔌 [SSH] Đang kết nối tới node: {host}...")
     
-    temp_payload = report.get("metrics", {}).get("temperature", {})
-    margin_val = None
-    if isinstance(temp_payload, dict):
-        margin_val = temp_payload.get("margin")
-    if margin_val is None:
-        margin_val = report.get("margin") or report.get("temperature_margin")
-        
-    if margin_val is not None:
-        lines.append(f"-> TEMP MARGIN: {margin_val}")
-        
-    lines.append("=============================\n")
-    return "\n".join(lines)
+    try:
+        # Bỏ qua host key check (known_hosts=None) để tối ưu vận hành trong môi trường Lab
+        async with asyncssh.connect(
+            host=host,
+            username=username,
+            password=password,
+            known_hosts=None,
+            connect_timeout=3  # Timeout ngắn để chu kỳ quét không bị nghẽn chết khi Node offline
+        ) as conn:
+            
+            logging.info(f"🚀 [SSH] Kết nối thành công! Đang chạy lệnh trên node: {host}...")
+            result = await conn.run("show version", timeout=3)
+            
+            # TODO (Day 39): Tích hợp Text Parser CLI để bóc tách text thật từ result.stdout ở đây.
+            # Hiện tại, trả về mock data cấu trúc chuẩn tương đương dummy_fetcher để nuôi bộ gầm.
+            logging.info(f"📄 [SSH] Nhận được output thô dài {len(result.stdout)} ký tự từ {host}")
+            return {
+                "cpu": [{"index": "all", "total": {"average-1": 15}}], 
+                "memory": {"utilization": 22},
+                "temperature": {"instant": 41, "alarm-status": False},
+                "healthz": {"status": "healthy"}
+            }
+            
+    except (asyncssh.Error, OSError) as e:
+        # Khi node chết hoặc không phản hồi, bẫy lỗi tại biên mạng và trả về cấu trúc Fallback an toàn
+        logging.error(f"❌ [SSH] Thất bại khi kết nối hoặc thực thi tại node {host}: {e}")
+        return {
+            "cpu": [{"index": "all", "total": {"average-1": 0}}], 
+            "memory": {"utilization": 0},
+            "temperature": {"instant": 0, "alarm-status": False},
+            "healthz": {"status": "unreachable", "reason": str(e)}
+        }
 
-def emit_alert(alert: Dict[str, Any]) -> None:
-    msg = f"🚨 [{alert['event']}] Metric '{alert['metric']}' is {alert['status']}. Reason: {alert['reason']}"
+
+# ==============================================================================
+# 3. TẦNG HIỂN THỊ VÀ OUTPUT CẢNH BÁO
+# ==============================================================================
+def emit_alert(host: str, alert: Dict[str, Any]) -> None:
+    """Bắn log cảnh báo chuẩn hóa có kèm nhãn Context định danh Node mạng cụ thể."""
+    msg = f"🚨 [{host}] [{alert['event']}] Metric '{alert['metric']}' is {alert['status']}. Reason: {alert['reason']}"
     logging.info(msg)
 
 
-# --- [Day 35] THE FUNCTIONAL CORE ---
+# ==============================================================================
+# 4. THE FUNCTIONAL CORE (PURE LOGIC) - [Day 35]
+# ==============================================================================
 def tick(
     raw_data: Dict[str, Any], 
     past_state: SystemAlertState, 
@@ -139,6 +114,9 @@ def tick(
     thresholds: Dict[str, int], 
     cooldown_seconds: int
 ) -> Tuple[List[Dict[str, Any]], SystemAlertState]:
+    """Hàm xử lý dữ liệu thuần túy (Pure Function). 
+    Không IO, không side-effect, đầu vào giống nhau luôn cho ra đầu ra giống nhau.
+    """
     analysis_result = evaluate_metrics(raw_data, thresholds)
     alerts, next_state = process_all_cooldowns(
         analysis_result=analysis_result,
@@ -149,62 +127,106 @@ def tick(
     return alerts, next_state
 
 
-# --- [Day 36 & 37] THE IMPERATIVE SHELL ---
-def main_loop(
+# ==============================================================================
+# 5. THE IMPERATIVE SHELL (ASYNC EVENT LOOP) - [Day 38]
+# ==============================================================================
+async def main_loop(
     interval_seconds: int = 2, 
     cooldown_seconds: int = 1, 
     config_path: str = "thresholds.json"
 ):
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor (Day 37)...")
+    """Vòng lặp điều phối chính của Daemon. Đảm nhận Structured Concurrency,
+    quản lý vòng đời tác vụ song song, bẫy tín hiệu OS và cô lập trạng thái Fleet.
+    """
+    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 38)...")
     
-    # 1. NẠP VÀ KIỂM TRA CẤU HÌNH ĐẦU VÀO (Fail-Fast)
+    # 5.1 Đăng ký Tín hiệu tắt ứng dụng an toàn qua Event Loop
+    _stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGTERM, lambda: _stop_event.set())
+    loop.add_signal_handler(signal.SIGINT, lambda: _stop_event.set())
+
+    # 5.2 Nạp cấu hình tĩnh đầu mùa (Fail-Fast Loader)
     try:
         current_thresholds = load_thresholds(config_path)
         logging.info(f"⚙️ Nạp cấu hình thành công từ '{config_path}': {current_thresholds}")
-    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError) as e:
+    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError):
         logging.critical(f"💥 KHÔNG THỂ KHỞI ĐỘNG: Lỗi cấu hình nghiêm trọng tại file '{config_path}'")
-        logging.critical(f"👉 Chi tiết lỗi: {e}")
-        raise  # Re-raise để đẩy quyền quyết định Exit Code cho entrypoint bọc ngoài
+        raise
 
-    # 2. KHỞI TẠO TRẠNG THÁI HỆ THỐNG
-    state_registry = SystemAlertState()
+    # 5.3 Khởi tạo danh sách Fleet và Cô lập trạng thái (Per-node State Isolation)
+    nodes = ["192.168.1.1", "192.168.1.2", "192.168.1.3"]
+    state_registry: Dict[str, SystemAlertState] = {host: SystemAlertState() for host in nodes}
 
     try:
         while not _stop_event.is_set():
-            raw_json = dummy_fetcher()
+            logging.info(f"--- 🔄 Bắt đầu chu kỳ quét mới trên toàn bộ {len(nodes)} nodes ---")
+            
+            node_tasks: Dict[str, asyncio.Task] = {}
+            
+            # 5.4 Kích hoạt Fan-out thu thập dữ liệu song song (TaskGroup)
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    for host in nodes:
+                        node_tasks[host] = tg.create_task(poll_node(host))
+            except* Exception as eg:
+                # Bẫy ExceptionGroup nếu có lỗi chưa xử lý lọt ra từ các Task con
+                logging.error(f"💥 Phát hiện lỗi nghiêm trọng trong nhóm tác vụ song song: {eg}")
+
+            # 5.5 Đẩy kết quả an toàn qua Functional Core xử lý độc lập
             now = time.time()
+            for host, task in node_tasks.items():
+                try:
+                    raw_data = task.result()
+                    
+                    # Trạng thái Cooldown của Node A hoàn toàn độc lập với Node B
+                    alerts, next_state = tick(
+                        raw_data=raw_data,
+                        past_state=state_registry[host],
+                        current_time=now,
+                        thresholds=current_thresholds,
+                        cooldown_seconds=cooldown_seconds
+                    )
+                    
+                    # Lưu lại trạng thái chu kỳ mới cho riêng Node đó
+                    state_registry[host] = next_state
+                    
+                    for alert in alerts:
+                        emit_alert(host, alert)
+                        
+                except Exception as e:
+                    logging.error(f"❌ Không thể xử lý dữ liệu phân tích cho node {host}: {e}")
             
-            alerts, state_registry = tick(
-                raw_data=raw_json,
-                past_state=state_registry,
-                current_time=now,
-                thresholds=current_thresholds,
-                cooldown_seconds=cooldown_seconds
-            )
-            
-            for alert in alerts:
-                emit_alert(alert)
+            # 5.6 Tighter Loop: Ngủ bất đồng bộ nhưng tỉnh giấc NGAY LẬP TỨC nếu nhận tín hiệu dừng
+            try:
+                await asyncio.wait_for(_stop_event.wait(), timeout=interval_seconds)
+            except asyncio.TimeoutError:
+                # Hết chu kỳ timeout bình thường, lặp tiếp sang chu kỳ sau
+                pass
                 
-            is_interrupted = _stop_event.wait(timeout=interval_seconds)
-            if is_interrupted:
-                logging.warning("🚨 Nhận tín hiệu kích hoạt dừng hệ thống (_stop_event được set).")
-                
-    except KeyboardInterrupt:
-        logging.warning("⚠️ Nhận tín hiệu ngắt từ bàn phím (Ctrl+C).")
-    except Exception as e:
-        logging.error(f"💥 Hệ thống gặp lỗi nghiêm trọng bất ngờ: {e}", exc_info=True)
+    except asyncio.CancelledError:
+        logging.warning("⚠️ Vòng lặp chính nhận tín hiệu hủy tác vụ (Task Cancelled).")
     finally:
         _stop_event.set()
         logging.info("🧹 Đang giải phóng tài nguyên hệ thống...")
         logging.info("🛑 SR Linux Monitor daemon stopped cleanly. Exit code 0.")
 
 
+# ==============================================================================
+# 6. BACKWARD COMPATIBILITY SHIMS (TƯƠNG THÍCH NGƯỢC CHO TEST CŨ)
+# ==============================================================================
+# Giữ lại ngưỡng memory sát để kích hoạt đúng trạng thái BREACH của test_pipeline cũ
+DEFAULT_THRESHOLDS = {"cpu": 80, "memory": 25, "temperature": 75}
+
+
+# ==============================================================================
+# 7. ENTRYPOINT (ĐIỂM KÍCH HOẠT ĐỒNG BỘ DUY NHẤT)
+# ==============================================================================
 if __name__ == "__main__":
-    import sys
     target_config = sys.argv[1] if len(sys.argv) > 1 else "thresholds.json"
     
     try:
-        main_loop(interval_seconds=2, cooldown_seconds=1, config_path=target_config)
+        # Điểm bọc đồng bộ duy nhất để dựng gầm Event Loop chạy daemon
+        asyncio.run(main_loop(interval_seconds=2, cooldown_seconds=1, config_path=target_config))
     except Exception:
-        # Chính sách Exit Code: Trả về lỗi 1 cho OS/Systemd nếu cấu hình hoặc khởi động fail
         sys.exit(1)
