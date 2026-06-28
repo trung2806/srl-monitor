@@ -1,14 +1,5 @@
-"""End-to-end seam test: SRLCliFetcher -> evaluate_metrics -> render, trên bytes
-THẬT của control_A.json qua mock SSH. Đây là lớp Day 28 còn thiếu: fetcher tới giờ
-chỉ test cô lập, main đọc thẳng file (bỏ qua transport). Test này lock contract
-fetcher↔monitor và đảm bảo lỗi fetch short-circuit trước khi evaluate thấy rác.
-
-KHÔNG đóng được: SSH thật (đây là mock); envelope thật của '... | as json' trên
-device (flat dict vs nested) vẫn nợ verify trên phần cứng.
-"""
 import json
 import pathlib
-
 import pytest
 
 from srl_fetcher import SRLCliFetcher, SRLFetchError
@@ -65,7 +56,7 @@ def test_pipeline_on_real_capture_bytes_through_evaluate():
 
 def test_pipeline_unwraps_single_element_list_envelope():
     """'... | as json' có path bọc object trong list 1 phần tử. Unwrap phòng thủ
-    phải cho metrics y hệt flat dict."""
+    must cho metrics y hệt flat dict."""
     cap = json.loads(REAL_BYTES)
     cpu_all = next(c for c in cap["cpu"] if c["index"] == "all")
     wrapped = json.dumps([cap])
@@ -76,14 +67,16 @@ def test_pipeline_unwraps_single_element_list_envelope():
 
 # --- error paths: lỗi fetch short-circuit pipeline, evaluate không chạy ---
 
-@pytest.mark.parametrize("bad_output, why", [
-    ("",                       "output rỗng"),
-    ("   \n",                  "whitespace-only -> rỗng"),
-    ("ERROR: unknown command", "CLI error, không phải JSON"),
-    ("[]",                     "JSON list rỗng"),
-    ("42",                     "JSON scalar, không phải dict"),
-    ('"a string"',             "JSON string, không phải dict"),
+@pytest.mark.parametrize("bad_output, expected_exception, why", [
+    ("",                       ValueError,            "output rỗng"),
+    ("   \n",                  ValueError,            "whitespace-only -> rỗng"),
+    ("ERROR: unknown command", json.JSONDecodeError, "CLI error, không phải JSON"),
+    ("[]",                     ValueError,            "JSON list rỗng"),
+    ("42",                     TypeError,             "JSON scalar, không phải dict"),
+    ('"a string"',             TypeError,             "JSON string, không phải dict"),
 ])
-def test_pipeline_fetch_errors_raise_before_evaluate(bad_output, why):
-    with pytest.raises(SRLFetchError):
+def test_pipeline_fetch_errors_raise_before_evaluate(bad_output, expected_exception, why):
+    """CẬP NHẬT: Kiểm tra chính xác loại stdlib exception bắn ra ứng với từng loại lỗi dữ liệu,
+    đảm bảo dữ liệu rác bị chặn đứng trước khi vào tầng evaluate."""
+    with pytest.raises(expected_exception):
         run_pipeline(FakeNetmiko(bad_output))

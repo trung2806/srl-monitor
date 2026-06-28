@@ -8,11 +8,13 @@ import asyncssh
 import ipaddress
 from typing import Dict, Any, List, Tuple
 
-# Import tầng xử lý logic từ các module lõi
+# Import tầng xử lý logic và cấu trúc dữ liệu dùng chung
 from srl_monitor import evaluate_metrics
 from srl_cooldown import SystemAlertState, process_all_cooldowns
+# Import hàm parse thuần túy và hằng số lệnh tập trung từ srl_fetcher
+from srl_fetcher import CONTROL_CMD, parse_control_output
 
-# Cấu hình hệ thống Log ghi song song ra Console và File
+# Cấu hình log tập trung song song ra stdout và file ngoài
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -22,12 +24,11 @@ logging.basicConfig(
     ]
 )
 
-
 # ==============================================================================
 # 1. TẦNG CONFIGURATION LOADER (FAIL-FAST)
 # ==============================================================================
 def load_thresholds(filepath: str) -> Dict[str, int]:
-    """Nạp và kiểm tra tính hợp lệ của file cấu hình ngưỡng giám sát."""
+    """Nạp và kiểm tra nghiêm ngặt tính hợp lệ của file cấu hình ngưỡng giám sát."""
     with open(filepath, "r", encoding="utf-8") as f:
         config = json.load(f)
         
@@ -81,39 +82,45 @@ def load_nodes(filepath: str) -> List[str]:
 
 
 # ==============================================================================
-# 2. TẦNG TRANSPORT NETWORKING (IO BOUNDARY)
+# 2. TẦNG TRANSPORT NETWORKING & PARSING (IO BOUNDARY)
 # ==============================================================================
 async def poll_node(host: str, username: str = "admin", password: str = "admin") -> Dict[str, Any]:
-    """Mở kết nối SSH bất đồng bộ, chạy lệnh lấy dữ liệu thô (Raw Fetcher)."""
+    """Mở kết nối SSH bất đồng bộ, chạy lệnh lấy dữ liệu thô và ép qua phễu lọc."""
     logging.info(f"🔌 [SSH] Đang kết nối tới node: {host}...")
     async with asyncssh.connect(
         host=host, username=username, password=password, known_hosts=None, connect_timeout=3
     ) as conn:
         logging.info(f"🚀 [SSH] Kết nối thành công! Đang chạy lệnh trên node: {host}...")
-        result = await conn.run("show version", timeout=3)
+        result = await conn.run(CONTROL_CMD, timeout=3)
         logging.info(f"📄 [SSH] Nhận được output thô dài {len(result.stdout)} ký tự từ {host}")
-        return {
-            "cpu": [{"index": "all", "total": {"average-1": 15}}], 
-            "memory": {"utilization": 22},
-            "temperature": {"instant": 41, "alarm-status": False},
-            "healthz": {"status": "healthy"}
-        }
+        
+        # Gọi hàm parse dùng chung từ srl_fetcher. Lỗi dữ liệu cấu trúc sai (ValueError/TypeError)
+        # hoặc lỗi chuỗi rỗng sẽ tự động phát sinh tại đây nếu có sai sót từ thiết bị.
+        return parse_control_output(result.stdout)
 
 
 async def safe_poll_node(host: str) -> Dict[str, Any]:
-    """🧱 LAYER 1 ERROR BOUNDARY: Vách ngăn Transport cách ly hoàn toàn lỗi mạng."""
+    """🧱 LAYER 1 ERROR BOUNDARY: Phân loại lỗi truyền dẫn (Transport) và lỗi cấu trúc dữ liệu (Data/Parse)."""
     try:
         return await poll_node(host)
     except (asyncssh.Error, OSError) as net_err:
-        logging.error(f"❌ [SSH] Node {host} unreachable: {net_err}")
+        logging.error(f"❌ [TRANSPORT ERROR] Node {host} unreachable hoặc timeout mạng: {net_err}")
         return {
             "cpu": [{"index": "all", "total": {"average-1": 0}}], 
             "memory": {"utilization": 0},
             "temperature": {"instant": 0, "alarm-status": False},
             "healthz": {"status": "unreachable", "reason": str(net_err)}
         }
+    except (ValueError, TypeError, json.JSONDecodeError) as parse_err:
+        logging.error(f"❌ [DATA PARSE ERROR] Node {host} trả về cấu trúc JSON bị hỏng hoặc thiếu: {parse_err}")
+        return {
+            "cpu": [{"index": "all", "total": {"average-1": 0}}], 
+            "memory": {"utilization": 0},
+            "temperature": {"instant": 0, "alarm-status": False},
+            "healthz": {"status": "bad_data", "reason": str(parse_err)}
+        }
     except Exception as bug:
-        logging.critical(f"💥 [BUG] safe_poll_node({host}): {bug}", exc_info=True)
+        logging.critical(f"💥 [BUG UNEXPECTED] safe_poll_node({host}): {bug}", exc_info=True)
         return {
             "cpu": [{"index": "all", "total": {"average-1": 0}}], 
             "memory": {"utilization": 0},
@@ -157,7 +164,7 @@ async def main_loop(
     config_path: str = "thresholds.json",
     nodes_path: str = "nodes.json"
 ):
-    """Vòng lặp chính điều phối xử lý theo mô hình Reactive (Xong node nào, xử lý ngay node đó)."""
+    """Vòng lặp chính điều phối xử lý theo mô hình Reactive (Xong node nào, xử lý real-time node đó)."""
     logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 39)...")
     
     _stop_event = asyncio.Event()
@@ -169,12 +176,12 @@ async def main_loop(
         current_thresholds = load_thresholds(config_path)
         nodes = load_nodes(nodes_path)
         logging.info(f"⚙️ Nạp cấu hình thành công từ '{config_path}': {current_thresholds}")
-        logging.info(f"🖥️ Nạp danh sách fleet động thành công từ '{nodes_path}': {nodes}")
-    except (FileNotFoundError, json.JSONDecodeError, TypeError, ValueError) as err:
+        logging.info(f"🖥️ Nạp danh sách fleet thành công từ '{nodes_path}': {nodes}")
+    except Exception as err:
         logging.critical(f"💥 KHÔNG THỂ KHỞI ĐỘNG DAEMON: Lỗi cấu hình hoặc danh sách thiết bị: {err}")
         raise
 
-    # [Tối ưu YAGNI] Định nghĩa wrapper ngoài vòng lặp while để tránh tạo function object liên tục
+    # Định nghĩa ngoài loop while để tối ưu hóa hiệu năng, tránh tạo đi tạo lại function object liên tục
     async def _wrapped_poll(host_str: str) -> Tuple[str, Dict[str, Any]]:
         data = await safe_poll_node(host_str)
         return host_str, data
@@ -185,17 +192,17 @@ async def main_loop(
         while not _stop_event.is_set():
             logging.info(f"--- 🔄 Bắt đầu chu kỳ quét mới trên toàn bộ {len(nodes)} nodes ---")
             
-            # Fan-out: Khởi tạo danh sách các Task chạy ngầm song song độc lập
+            # Fan-out: Tạo danh sách các task chạy song song bất đồng bộ
             tasks = [asyncio.create_task(_wrapped_poll(host)) for host in nodes]
             
-            # Sử dụng vòng lặp thường lướt qua iterator đồng bộ của as_completed
+            # Duyệt qua bộ lặp đồng bộ của as_completed
             for fut in asyncio.as_completed(tasks):
                 host, raw_data = await fut
                 
-                # Reactive Timestamping: Đo thời gian độc lập ngay khi nhận được dữ liệu
+                # Reactive Timestamping: Lấy thời gian độc lập ngay khi node vừa trả kết quả về
                 now = time.time()
                 
-                # 🧱 LAYER 2 ERROR BOUNDARY: Cách ly lỗi logic xử lý của từng node riêng biệt
+                # 🧱 LAYER 2 ERROR BOUNDARY: Cách ly hoàn toàn lỗi logic xử lý giữa các node riêng biệt
                 try:
                     alerts, next_state = tick(
                         raw_data=raw_data,
@@ -212,7 +219,7 @@ async def main_loop(
                 except Exception as bug:
                     logging.critical(f"💥 [LOGIC BUG] Lỗi xử lý dữ liệu cho node {host}: {bug}", exc_info=True)
             
-            # Chờ đến chu kỳ quét tiếp theo hoặc thoát ra nếu nhận tín hiệu kết thúc
+            # Chờ chu kỳ tiếp theo hoặc thoát ra nếu nhận tín hiệu dừng hệ thống
             try:
                 await asyncio.wait_for(_stop_event.wait(), timeout=interval_seconds)
             except asyncio.TimeoutError:
@@ -222,18 +229,12 @@ async def main_loop(
         logging.warning("⚠️ Vòng lặp chính nhận tín hiệu hủy tác vụ.")
     finally:
         _stop_event.set()
-        logging.info("🛑 SR Linux Monitor daemon stopped cleanly. Exit code 0.")
+        logging.info("🛑 SR Linux Monitor daemon đã dừng sạch sẽ. Exit code 0.")
 
 
-# ==============================================================================
-# 6. BACKWARD COMPATIBILITY SHIMS
-# ==============================================================================
+# Hằng số tương thích ngược nếu cần
 DEFAULT_THRESHOLDS = {"cpu": 80, "memory": 25, "temperature": 75}
 
-
-# ==============================================================================
-# 7. ENTRYPOINT
-# ==============================================================================
 if __name__ == "__main__":
     target_config = sys.argv[1] if len(sys.argv) > 1 else "thresholds.json"
     target_nodes = sys.argv[2] if len(sys.argv) > 2 else "nodes.json"
