@@ -36,15 +36,14 @@ def load_thresholds(filepath: str) -> Dict[str, int]:
     """Nạp và kiểm tra nghiêm ngặt tính hợp lệ của file cấu hình ngưỡng giám sát."""
     with open(filepath, "r", encoding="utf-8") as f:
         config = json.load(f)
-        
+
     if not isinstance(config, dict):
         raise TypeError(f"Cấu hình gốc phải là một dictionary. Nhận được: {type(config).__name__}")
-        
+
     required_keys = {"cpu", "memory", "temperature"}
     missing_keys = required_keys - config.keys()
     if missing_keys:
         raise ValueError(f"File cấu hình thiếu các key bắt buộc: {', '.join(sorted(missing_keys))}")
-        
     validated_thresholds: Dict[str, int] = {}
     for key in required_keys:
         val = config[key]
@@ -53,7 +52,7 @@ def load_thresholds(filepath: str) -> Dict[str, int]:
         if val <= 0:
             raise ValueError(f"Ngưỡng của '{key}' phải lớn hơn 0. Nhận được: {val}")
         validated_thresholds[key] = val
-        
+
     return validated_thresholds
 
 
@@ -71,7 +70,7 @@ def load_nodes(filepath: str) -> List[str]:
     for i, node in enumerate(data):
         if not isinstance(node, str):
             raise TypeError(f"Phần tử [{i}] phải là str. Nhận được: {type(node).__name__}")
-            
+
         try:
             ipaddress.ip_address(node)
         except ValueError:
@@ -98,9 +97,7 @@ async def poll_node(host: str, username: str = "admin", password: str = "admin")
         logging.info(f"🚀 [SSH] Kết nối thành công! Đang chạy lệnh trên node: {host}...")
         result = await conn.run(CONTROL_CMD, timeout=3)
         logging.info(f"📄 [SSH] Nhận được output thô dài {len(result.stdout)} ký tự từ {host}")
-        
-        # Gọi hàm parse dùng chung từ srl_fetcher. Lỗi dữ liệu cấu trúc sai (ValueError/TypeError)
-        # hoặc lỗi chuỗi rỗng sẽ tự động phát sinh tại đây nếu có sai sót từ thiết bị.
+
         return parse_control_output(result.stdout)
 
 
@@ -111,7 +108,7 @@ async def safe_poll_node(host: str) -> Dict[str, Any]:
     except (asyncssh.Error, OSError) as net_err:
         logging.error(f"❌ [TRANSPORT ERROR] Node {host} unreachable hoặc timeout mạng: {net_err}")
         return {
-            "cpu": [{"index": "all", "total": {"average-1": 0}}], 
+            "cpu": [{"index": "all", "total": {"average-1": 0}}],
             "memory": {"utilization": 0},
             "temperature": {"instant": 0, "alarm-status": False},
             "healthz": {"status": "unreachable", "reason": str(net_err)}
@@ -119,7 +116,7 @@ async def safe_poll_node(host: str) -> Dict[str, Any]:
     except (ValueError, TypeError, json.JSONDecodeError) as parse_err:
         logging.error(f"❌ [DATA PARSE ERROR] Node {host} trả về cấu trúc JSON bị hỏng hoặc thiếu: {parse_err}")
         return {
-            "cpu": [{"index": "all", "total": {"average-1": 0}}], 
+            "cpu": [{"index": "all", "total": {"average-1": 0}}],
             "memory": {"utilization": 0},
             "temperature": {"instant": 0, "alarm-status": False},
             "healthz": {"status": "bad_data", "reason": str(parse_err)}
@@ -127,7 +124,7 @@ async def safe_poll_node(host: str) -> Dict[str, Any]:
     except Exception as bug:
         logging.critical(f"💥 [BUG UNEXPECTED] safe_poll_node({host}): {bug}", exc_info=True)
         return {
-            "cpu": [{"index": "all", "total": {"average-1": 0}}], 
+            "cpu": [{"index": "all", "total": {"average-1": 0}}],
             "memory": {"utilization": 0},
             "temperature": {"instant": 0, "alarm-status": False},
             "healthz": {"status": "error", "reason": str(bug)}
@@ -145,7 +142,7 @@ async def _wrapped_poll(host_str: str, timeout: float = POLL_TIMEOUT_SECONDS) ->
         data = await asyncio.wait_for(safe_poll_node(host_str), timeout=timeout)
     except asyncio.TimeoutError:
         logging.warning(
-            f"⏱️ [POLL TIMEOUT] Node {host_str} không phản hồi sau {timeout}s — dùng fallback timeout."
+            f"⏱️  [POLL TIMEOUT] Node {host_str} không phản hồi sau {timeout}s — dùng fallback timeout."
         )
         data = {
             "cpu": [{"index": "all", "total": {"average-1": 0}}],
@@ -177,10 +174,10 @@ def emit_alert(host: str, alert: Dict[str, Any]) -> None:
 # 4. THE FUNCTIONAL CORE (PURE LOGIC)
 # ==============================================================================
 def tick(
-    raw_data: Dict[str, Any], 
-    past_state: SystemAlertState, 
-    current_time: float, 
-    thresholds: Dict[str, int], 
+    raw_data: Dict[str, Any],
+    past_state: SystemAlertState,
+    current_time: float,
+    thresholds: Dict[str, int],
     cooldown_seconds: int
 ) -> Tuple[List[Dict[str, Any]], SystemAlertState]:
     analysis_result = evaluate_metrics(raw_data, thresholds)
@@ -203,7 +200,7 @@ async def main_loop(
     poll_timeout: float = POLL_TIMEOUT_SECONDS,
 ):
     """Vòng lặp chính điều phối xử lý theo mô hình Reactive (Xong node nào, xử lý real-time node đó)."""
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 41)...")
+    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 42)...")
 
     _stop_event = asyncio.Event()
     _reload_event = asyncio.Event()
@@ -216,7 +213,7 @@ async def main_loop(
         current_thresholds = load_thresholds(config_path)
         nodes = load_nodes(nodes_path)
         logging.info(f"⚙️ Nạp cấu hình thành công từ '{config_path}': {current_thresholds}")
-        logging.info(f"🖥️ Nạp danh sách fleet thành công từ '{nodes_path}': {nodes}")
+        logging.info(f"🖥️  Nạp danh sách fleet thành công từ '{nodes_path}': {nodes}")
     except Exception as err:
         logging.critical(f"💥 KHÔNG THỂ KHỞI ĐỘNG DAEMON: Lỗi cấu hình hoặc danh sách thiết bị: {err}")
         raise
@@ -225,62 +222,102 @@ async def main_loop(
 
     try:
         while not _stop_event.is_set():
-            # --- SIGHUP: hot-reload fleet list (hiệu lực đầu mỗi chu kỳ) ---
+            # --- SIGHUP: hot-reload fleet list & thresholds (hiệu lực đầu mỗi chu kỳ) ---
             if _reload_event.is_set():
                 _reload_event.clear()
                 try:
+                    try:
+                        current_thresholds = load_thresholds(config_path)
+                    except Exception as config_err:
+                        logging.error(f"❌ [SIGHUP] Nạp lại thresholds thất bại, giữ cấu hình cũ: {config_err}")
+
                     new_nodes = load_nodes(nodes_path)
                     state_registry = _apply_node_reload(new_nodes, state_registry)
                     nodes = new_nodes
-                    logging.info(f"🔄 [SIGHUP] Fleet hot-reloaded: {nodes}")
+                    logging.info(f"🔄 [SIGHUP] Fleet hot-reloaded thành công. Tổng nodes: {len(nodes)}")
                 except Exception as err:
-                    logging.error(f"❌ [SIGHUP] Reload failed, keeping old list: {err}")
+                    logging.error(f"❌ [SIGHUP] Reload danh sách node thất bại, giữ nguyên fleet cũ: {err}")
 
             logging.info(f"--- 🔄 Bắt đầu chu kỳ quét mới trên toàn bộ {len(nodes)} nodes ---")
 
             # Fan-out: Tạo danh sách các task chạy song song bất đồng bộ
             tasks = [asyncio.create_task(_wrapped_poll(host, poll_timeout)) for host in nodes]
 
-            # Duyệt reactive; finally cancel orphaned tasks nếu stop_event fire giữa cycle
+            # stop_task tạo một lần cho cả chu kỳ — reuse qua mọi vòng lặp xử lý kết quả
+            stop_task = asyncio.create_task(_stop_event.wait())
+
             try:
-                for fut in asyncio.as_completed(tasks):
-                    host, raw_data = await fut
-                    if _stop_event.is_set():
+                while tasks and not _stop_event.is_set():
+                    done, _ = await asyncio.wait(
+                        tasks + [stop_task],
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+
+                    if stop_task in done:
+                        logging.warning("🛑 [STOP] Nhận tín hiệu tắt hệ thống khi đang chờ dữ liệu mạng! Ngắt chu kỳ ngay lập tức.")
                         break
 
-                    # Reactive Timestamping: Lấy thời gian độc lập ngay khi node vừa trả kết quả về
-                    now = time.time()
+                    for fut in done:
+                        if fut in tasks:
+                            tasks.remove(fut)
+                            host, raw_data = fut.result()
 
-                    # 🧱 LAYER 2 ERROR BOUNDARY: Cách ly hoàn toàn lỗi logic xử lý giữa các node riêng biệt
-                    try:
-                        alerts, next_state = tick(
-                            raw_data=raw_data,
-                            past_state=state_registry[host],
-                            current_time=now,
-                            thresholds=current_thresholds,
-                            cooldown_seconds=cooldown_seconds,
-                        )
-                        state_registry[host] = next_state
-                        for alert in alerts:
-                            emit_alert(host, alert)
-                    except Exception as bug:
-                        logging.critical(
-                            f"💥 [LOGIC BUG] Lỗi xử lý dữ liệu cho node {host}: {bug}", exc_info=True
-                        )
+                            now = time.time()
+
+                            # 🧱 LAYER 2 ERROR BOUNDARY
+                            try:
+                                alerts, next_state = tick(
+                                    raw_data=raw_data,
+                                    past_state=state_registry[host],
+                                    current_time=now,
+                                    thresholds=current_thresholds,
+                                    cooldown_seconds=cooldown_seconds,
+                                )
+                                state_registry[host] = next_state
+                                for alert in alerts:
+                                    emit_alert(host, alert)
+                            except Exception as bug:
+                                logging.critical(
+                                    f"💥 [LOGIC BUG] Lỗi xử lý dữ liệu cho node {host}: {bug}", exc_info=True
+                                )
             finally:
-                # Cancel tasks chưa hoàn thành (tránh orphaned coroutines sau khi stop_event fire)
+                # Dọn stop_task của chu kỳ này
+                if not stop_task.done():
+                    stop_task.cancel()
+                    try:
+                        await stop_task
+                    except asyncio.CancelledError:
+                        pass
+
+                # Cancel orphaned network tasks
                 orphaned = [t for t in tasks if not t.done()]
                 for t in orphaned:
                     t.cancel()
                 if orphaned:
+                    logging.info(f"🧹 Đang giải phóng {len(orphaned)} tác vụ mạng đang chạy ngầm...")
                     await asyncio.gather(*orphaned, return_exceptions=True)
 
-            # Chờ chu kỳ tiếp theo hoặc thoát ra nếu nhận tín hiệu dừng hệ thống
-            try:
-                await asyncio.wait_for(_stop_event.wait(), timeout=interval_seconds)
-            except asyncio.TimeoutError:
-                pass
-                
+            if _stop_event.is_set():
+                break
+
+            # --- Reactive Sleep: ngắt ngay khi có SIGHUP hoặc SIGTERM/SIGINT ---
+            sleep_task = asyncio.create_task(asyncio.sleep(interval_seconds))
+            stop_task_sleep = asyncio.create_task(_stop_event.wait())
+            reload_task = asyncio.create_task(_reload_event.wait())
+
+            done_sleep, pending_sleep = await asyncio.wait(
+                [sleep_task, stop_task_sleep, reload_task],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            for t in pending_sleep:
+                t.cancel()
+            if pending_sleep:
+                await asyncio.gather(*pending_sleep, return_exceptions=True)
+
+            if _reload_event.is_set():
+                logging.info("⚡ [SIGHUP] Phát hiện lệnh reload trong pha nghỉ. Ngắt sleep để thực thi ngay lập tức!")
+
     except asyncio.CancelledError:
         logging.warning("⚠️ Vòng lặp chính nhận tín hiệu hủy tác vụ.")
     finally:

@@ -82,6 +82,60 @@ async def test_main_loop_sighup_triggers_fleet_reload(tmp_path):
 # ==============================================================================
 
 @pytest.mark.asyncio
+async def test_main_loop_reactive_sighup_wakes_from_sleep(tmp_path):
+    """Reactive sleep: SIGHUP fire lúc daemon đang sleep dài phải ngắt sleep ngay lập tức,
+    không chờ hết interval_seconds. Verify bằng cách đo elapsed time.
+    """
+    config_file = tmp_path / "thresholds.json"
+    config_file.write_text(json.dumps({"cpu": 80, "memory": 90, "temperature": 75}))
+    nodes_file = tmp_path / "nodes.json"
+    nodes_file.write_text(json.dumps(["10.0.0.1"]))
+
+    cycle_count = 0
+
+    async def fast_poll(host: str, timeout: float = main.POLL_TIMEOUT_SECONDS):
+        nonlocal cycle_count
+        cycle_count += 1
+        return host, _HEALTHY_DATA
+
+    with patch("main._wrapped_poll", side_effect=fast_poll):
+        import time as _time
+        start = _time.monotonic()
+
+        loop_task = asyncio.create_task(
+            main.main_loop(
+                interval_seconds=30,   # sleep 30s — sẽ không bao giờ hết nếu reactive hoạt động
+                cooldown_seconds=1,
+                config_path=str(config_file),
+                nodes_path=str(nodes_file),
+            )
+        )
+
+        # Đợi cycle đầu chạy xong, daemon đang trong sleep 30s
+        await asyncio.sleep(0.1)
+
+        # Gửi SIGHUP → reactive sleep phải ngắt ngay, reload và bắt đầu cycle 2
+        os.kill(os.getpid(), signal.SIGHUP)
+        await asyncio.sleep(0.2)   # cho đủ thời gian cycle 2 chạy
+
+        # Dừng daemon
+        os.kill(os.getpid(), signal.SIGINT)
+        try:
+            await asyncio.wait_for(loop_task, timeout=2.0)
+        except asyncio.TimeoutError:
+            loop_task.cancel()
+            await asyncio.gather(loop_task, return_exceptions=True)
+            pytest.fail("main_loop hung sau SIGINT")
+
+        elapsed = _time.monotonic() - start
+
+    # Nếu reactive KHÔNG hoạt động: cycle 2 sẽ bắt đầu sau 30s → elapsed > 30s
+    # Nếu reactive hoạt động: cycle 2 bắt đầu sau ~0.1s → elapsed < 5s
+    assert elapsed < 5.0, f"SIGHUP không wake sleep sớm — elapsed={elapsed:.2f}s"
+    assert cycle_count >= 2, f"Chỉ chạy {cycle_count} cycle — SIGHUP reload không kích hoạt cycle 2"
+
+
+@pytest.mark.asyncio
 async def test_main_loop_exits_promptly_despite_slow_nodes(tmp_path):
     """Item 1 + 2: Với node cực chậm, main_loop vẫn thoát trong thời gian poll_timeout
     (không bị kẹt 999s). Cơ chế: outer watchdog (asyncio.wait_for) timeout safe_poll_node,
