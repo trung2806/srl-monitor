@@ -6,7 +6,7 @@ import signal
 import asyncio
 import asyncssh
 import ipaddress
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Set, Tuple
 
 # Import tầng xử lý logic và cấu trúc dữ liệu dùng chung
 from srl_monitor import evaluate_metrics
@@ -200,7 +200,7 @@ async def main_loop(
     poll_timeout: float = POLL_TIMEOUT_SECONDS,
 ):
     """Vòng lặp chính điều phối xử lý theo mô hình Reactive (Xong node nào, xử lý real-time node đó)."""
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 42)...")
+    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 43)...")
 
     _stop_event = asyncio.Event()
     _reload_event = asyncio.Event()
@@ -222,7 +222,7 @@ async def main_loop(
 
     try:
         while not _stop_event.is_set():
-            # --- SIGHUP: hot-reload fleet list & thresholds (hiệu lực đầu mỗi chu kỳ) ---
+            # --- SIGHUP: hot-reload fleet list & thresholds ---
             if _reload_event.is_set():
                 _reload_event.clear()
                 try:
@@ -240,28 +240,26 @@ async def main_loop(
 
             logging.info(f"--- 🔄 Bắt đầu chu kỳ quét mới trên toàn bộ {len(nodes)} nodes ---")
 
-            # Fan-out: Tạo danh sách các task chạy song song bất đồng bộ
-            tasks = [asyncio.create_task(_wrapped_poll(host, poll_timeout)) for host in nodes]
+            # Fan-out: set thay list → O(1) discard thay O(n) remove
+            tasks: Set[asyncio.Task] = {asyncio.create_task(_wrapped_poll(host, poll_timeout)) for host in nodes}
 
-            # stop_task tạo một lần cho cả chu kỳ — reuse qua mọi vòng lặp xử lý kết quả
+            # stop_task sống trong cùng set — không cần tasks+[stop_task] mỗi vòng
             stop_task = asyncio.create_task(_stop_event.wait())
+            tasks.add(stop_task)
 
             try:
-                while tasks and not _stop_event.is_set():
-                    done, _ = await asyncio.wait(
-                        tasks + [stop_task],
-                        return_when=asyncio.FIRST_COMPLETED
-                    )
+                # len > 1 vì stop_task luôn ở trong set cho đến cuối chu kỳ
+                while len(tasks) > 1 and not _stop_event.is_set():
+                    done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
                     if stop_task in done:
                         logging.warning("🛑 [STOP] Nhận tín hiệu tắt hệ thống khi đang chờ dữ liệu mạng! Ngắt chu kỳ ngay lập tức.")
                         break
 
                     for fut in done:
-                        if fut in tasks:
-                            tasks.remove(fut)
+                        if fut is not stop_task:
+                            tasks.discard(fut)
                             host, raw_data = fut.result()
-
                             now = time.time()
 
                             # 🧱 LAYER 2 ERROR BOUNDARY
@@ -281,7 +279,8 @@ async def main_loop(
                                     f"💥 [LOGIC BUG] Lỗi xử lý dữ liệu cho node {host}: {bug}", exc_info=True
                                 )
             finally:
-                # Dọn stop_task của chu kỳ này
+                # Tách stop_task ra trước khi tính orphaned — stop_task không phải network task
+                tasks.discard(stop_task)
                 if not stop_task.done():
                     stop_task.cancel()
                     try:
@@ -289,7 +288,6 @@ async def main_loop(
                     except asyncio.CancelledError:
                         pass
 
-                # Cancel orphaned network tasks
                 orphaned = [t for t in tasks if not t.done()]
                 for t in orphaned:
                     t.cancel()
@@ -306,7 +304,7 @@ async def main_loop(
             reload_task = asyncio.create_task(_reload_event.wait())
 
             done_sleep, pending_sleep = await asyncio.wait(
-                [sleep_task, stop_task_sleep, reload_task],
+                {sleep_task, stop_task_sleep, reload_task},
                 return_when=asyncio.FIRST_COMPLETED
             )
 
