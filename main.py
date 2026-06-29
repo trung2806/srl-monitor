@@ -28,6 +28,9 @@ logging.basicConfig(
 # Outer Watchdog: lớn hơn tổng bộ đếm inner timeouts (3s connect + 3s cmd = 6s). Buffer 4s bảo toàn error taxonomy.
 POLL_TIMEOUT_SECONDS = 10
 
+# Các trạng thái lỗi do safe_poll_node và _wrapped_poll inject — chỉ những status này mới bị filter
+_INFRA_ERROR_STATUSES = frozenset({"unreachable", "bad_data", "error", "timeout"})
+
 # ==============================================================================
 # 0. TẦNG OBSERVABILITY (INTERNAL METRICS LAYER)
 # ==============================================================================
@@ -210,7 +213,7 @@ async def main_loop(
     poll_timeout: float = POLL_TIMEOUT_SECONDS,
 ):
     """Vòng lặp chính điều phối xử lý theo mô hình Reactive và quản lý bẫy tín hiệu."""
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 44)...")
+    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 45)...")
 
     _stop_event = asyncio.Event()
     _reload_event = asyncio.Event()
@@ -221,7 +224,7 @@ async def main_loop(
     loop.add_signal_handler(signal.SIGINT, lambda: _stop_event.set())
     loop.add_signal_handler(signal.SIGHUP, lambda: _reload_event.set())
 
-    # SIGUSR1 HANDLER: On-demand telemetry dump, chuyển hóa cấu trúc dữ liệu sang Inline JSON
+    # SIGUSR1 HANDLER: On-demand telemetry dump dạng Inline JSON
     loop.add_signal_handler(
         signal.SIGUSR1,
         lambda: logging.info(f"📊 [STATS DUMP] {json.dumps(asdict(STATS))}")
@@ -277,6 +280,15 @@ async def main_loop(
                             tasks.discard(fut)
                             host, raw_data = fut.result()
                             now = time.time()
+
+                            # INFRASTRUCTURE FILTER GUARD: bỏ qua node lỗi để bảo toàn cooldown state cũ
+                            healthz = raw_data.get("healthz")
+                            if healthz and healthz.get("status") in _INFRA_ERROR_STATUSES:
+                                logging.warning(
+                                    f"⚠️ [{host}] Bỏ qua phân tích metrics chu kỳ này do lỗi hạ tầng: "
+                                    f"{healthz['status']} - {healthz.get('reason', 'unknown')}"
+                                )
+                                continue
 
                             # 🧱 LAYER 2 ERROR BOUNDARY
                             try:

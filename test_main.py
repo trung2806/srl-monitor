@@ -1,3 +1,6 @@
+import json
+import os
+import signal
 import pytest
 from unittest.mock import patch
 import asyncio
@@ -154,3 +157,83 @@ def test_apply_node_reload_drops_removed_nodes():
     assert "10.0.0.1" in new_registry
     assert "10.0.0.99" not in new_registry
     assert len(new_registry) == 1
+
+
+# ==============================================================================
+# D45: INFRASTRUCTURE FILTER GUARD
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_main_loop_skips_tick_for_error_node(tmp_path):
+    """Filter guard D45: node trả về healthz.status lỗi → tick() KHÔNG được gọi.
+    Verify bảo toàn cooldown state: state_registry không bị overwrite bởi fallback zeros.
+    """
+    config_file = tmp_path / "thresholds.json"
+    config_file.write_text(json.dumps({"cpu": 80, "memory": 90, "temperature": 75}))
+    nodes_file = tmp_path / "nodes.json"
+    nodes_file.write_text(json.dumps(["10.0.0.1"]))
+
+    timeout_data = {
+        "cpu": [{"index": "all", "total": {"average-1": 0}}],
+        "memory": {"utilization": 0},
+        "temperature": {"instant": 0, "alarm-status": False},
+        "healthz": {"status": "timeout", "reason": "poll exceeded 10s"},
+    }
+
+    async def error_poll(host, timeout=main.POLL_TIMEOUT_SECONDS):
+        return host, timeout_data
+
+    with patch("main._wrapped_poll", side_effect=error_poll), \
+         patch("main.tick", return_value=([], SystemAlertState())) as mock_tick:
+        task = asyncio.create_task(main.main_loop(
+            interval_seconds=0, cooldown_seconds=1,
+            config_path=str(config_file), nodes_path=str(nodes_file),
+        ))
+        await asyncio.sleep(0.1)
+        os.kill(os.getpid(), signal.SIGINT)
+        try:
+            await asyncio.wait_for(task, timeout=2.0)
+        except asyncio.TimeoutError:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    assert mock_tick.call_count == 0, (
+        f"tick() bị gọi {mock_tick.call_count} lần dù node trả về lỗi — filter guard không hoạt động"
+    )
+
+
+@pytest.mark.asyncio
+async def test_main_loop_calls_tick_for_real_device_data(tmp_path):
+    """Filter guard D45: node trả về data thật (không có healthz) → tick() PHẢI được gọi."""
+    config_file = tmp_path / "thresholds.json"
+    config_file.write_text(json.dumps({"cpu": 80, "memory": 90, "temperature": 75}))
+    nodes_file = tmp_path / "nodes.json"
+    nodes_file.write_text(json.dumps(["10.0.0.1"]))
+
+    real_data = {
+        "cpu": [{"index": "all", "total": {"average-1": 10, "average-5": 9, "average-15": 8}}],
+        "memory": {"utilization": 10},
+        "temperature": {"instant": 30, "alarm-status": False},
+        # Không có healthz — khớp với output thật của parse_control_output
+    }
+
+    async def real_poll(host, timeout=main.POLL_TIMEOUT_SECONDS):
+        return host, real_data
+
+    with patch("main._wrapped_poll", side_effect=real_poll), \
+         patch("main.tick", return_value=([], SystemAlertState())) as mock_tick:
+        task = asyncio.create_task(main.main_loop(
+            interval_seconds=0, cooldown_seconds=1,
+            config_path=str(config_file), nodes_path=str(nodes_file),
+        ))
+        await asyncio.sleep(0.1)
+        os.kill(os.getpid(), signal.SIGINT)
+        try:
+            await asyncio.wait_for(task, timeout=2.0)
+        except asyncio.TimeoutError:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    assert mock_tick.call_count >= 1, (
+        f"tick() không được gọi dù node trả về data sạch — filter guard chặn nhầm"
+    )
