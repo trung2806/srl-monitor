@@ -24,6 +24,11 @@ logging.basicConfig(
     ]
 )
 
+# Outer Watchdog: phải lớn hơn tổng inner timeouts (connect_timeout=3 + SSH command timeout=3 = 6s).
+# Buffer 4s bảo toàn error taxonomy: asyncssh.Error/OSError nổ trước → safe_poll_node phân loại đúng.
+# Nếu outer == inner: race condition khiến asyncio.TimeoutError cướp trước, mất thông tin lỗi chi tiết.
+POLL_TIMEOUT_SECONDS = 10
+
 # ==============================================================================
 # 1. TẦNG CONFIGURATION LOADER (FAIL-FAST)
 # ==============================================================================
@@ -130,6 +135,38 @@ async def safe_poll_node(host: str) -> Dict[str, Any]:
 
 
 # ==============================================================================
+# 2.5. MODULE-LEVEL TRANSPORT WRAPPER + FLEET RELOAD HELPER
+# ==============================================================================
+async def _wrapped_poll(host_str: str, timeout: float = POLL_TIMEOUT_SECONDS) -> Tuple[str, Dict[str, Any]]:
+    """Outer watchdog cho safe_poll_node: bounds per-node với asyncio.wait_for, luôn trả (host, data).
+    TimeoutError path trả status='timeout' để downstream phân biệt với transport error / data error.
+    """
+    try:
+        data = await asyncio.wait_for(safe_poll_node(host_str), timeout=timeout)
+    except asyncio.TimeoutError:
+        logging.warning(
+            f"⏱️ [POLL TIMEOUT] Node {host_str} không phản hồi sau {timeout}s — dùng fallback timeout."
+        )
+        data = {
+            "cpu": [{"index": "all", "total": {"average-1": 0}}],
+            "memory": {"utilization": 0},
+            "temperature": {"instant": 0, "alarm-status": False},
+            "healthz": {"status": "timeout", "reason": f"poll exceeded {timeout}s"},
+        }
+    return host_str, data
+
+
+def _apply_node_reload(
+    new_nodes: List[str],
+    current_registry: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Pure function: merge new node list với current state registry.
+    Preserved: state cho node còn trong list. Fresh: node mới. Dropped: node bị xóa.
+    """
+    return {h: current_registry.get(h, SystemAlertState()) for h in new_nodes}
+
+
+# ==============================================================================
 # 3. TẦNG OUTPUT CẢNH BÁO
 # ==============================================================================
 def emit_alert(host: str, alert: Dict[str, Any]) -> None:
@@ -159,18 +196,21 @@ def tick(
 # 5. THE IMPERATIVE SHELL (ASYNC EVENT LOOP)
 # ==============================================================================
 async def main_loop(
-    interval_seconds: int = 2, 
-    cooldown_seconds: int = 1, 
+    interval_seconds: int = 2,
+    cooldown_seconds: int = 1,
     config_path: str = "thresholds.json",
-    nodes_path: str = "nodes.json"
+    nodes_path: str = "nodes.json",
+    poll_timeout: float = POLL_TIMEOUT_SECONDS,
 ):
     """Vòng lặp chính điều phối xử lý theo mô hình Reactive (Xong node nào, xử lý real-time node đó)."""
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 39)...")
-    
+    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 41)...")
+
     _stop_event = asyncio.Event()
+    _reload_event = asyncio.Event()
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGTERM, lambda: _stop_event.set())
     loop.add_signal_handler(signal.SIGINT, lambda: _stop_event.set())
+    loop.add_signal_handler(signal.SIGHUP, lambda: _reload_event.set())
 
     try:
         current_thresholds = load_thresholds(config_path)
@@ -181,44 +221,60 @@ async def main_loop(
         logging.critical(f"💥 KHÔNG THỂ KHỞI ĐỘNG DAEMON: Lỗi cấu hình hoặc danh sách thiết bị: {err}")
         raise
 
-    # Định nghĩa ngoài loop while để tối ưu hóa hiệu năng, tránh tạo đi tạo lại function object liên tục
-    async def _wrapped_poll(host_str: str) -> Tuple[str, Dict[str, Any]]:
-        data = await safe_poll_node(host_str)
-        return host_str, data
-
     state_registry: Dict[str, SystemAlertState] = {host: SystemAlertState() for host in nodes}
 
     try:
         while not _stop_event.is_set():
-            logging.info(f"--- 🔄 Bắt đầu chu kỳ quét mới trên toàn bộ {len(nodes)} nodes ---")
-            
-            # Fan-out: Tạo danh sách các task chạy song song bất đồng bộ
-            tasks = [asyncio.create_task(_wrapped_poll(host)) for host in nodes]
-            
-            # Duyệt qua bộ lặp đồng bộ của as_completed
-            for fut in asyncio.as_completed(tasks):
-                host, raw_data = await fut
-                
-                # Reactive Timestamping: Lấy thời gian độc lập ngay khi node vừa trả kết quả về
-                now = time.time()
-                
-                # 🧱 LAYER 2 ERROR BOUNDARY: Cách ly hoàn toàn lỗi logic xử lý giữa các node riêng biệt
+            # --- SIGHUP: hot-reload fleet list (hiệu lực đầu mỗi chu kỳ) ---
+            if _reload_event.is_set():
+                _reload_event.clear()
                 try:
-                    alerts, next_state = tick(
-                        raw_data=raw_data,
-                        past_state=state_registry[host],
-                        current_time=now,
-                        thresholds=current_thresholds,
-                        cooldown_seconds=cooldown_seconds
-                    )
-                    
-                    state_registry[host] = next_state
-                    for alert in alerts:
-                        emit_alert(host, alert)
-                        
-                except Exception as bug:
-                    logging.critical(f"💥 [LOGIC BUG] Lỗi xử lý dữ liệu cho node {host}: {bug}", exc_info=True)
-            
+                    new_nodes = load_nodes(nodes_path)
+                    state_registry = _apply_node_reload(new_nodes, state_registry)
+                    nodes = new_nodes
+                    logging.info(f"🔄 [SIGHUP] Fleet hot-reloaded: {nodes}")
+                except Exception as err:
+                    logging.error(f"❌ [SIGHUP] Reload failed, keeping old list: {err}")
+
+            logging.info(f"--- 🔄 Bắt đầu chu kỳ quét mới trên toàn bộ {len(nodes)} nodes ---")
+
+            # Fan-out: Tạo danh sách các task chạy song song bất đồng bộ
+            tasks = [asyncio.create_task(_wrapped_poll(host, poll_timeout)) for host in nodes]
+
+            # Duyệt reactive; finally cancel orphaned tasks nếu stop_event fire giữa cycle
+            try:
+                for fut in asyncio.as_completed(tasks):
+                    host, raw_data = await fut
+                    if _stop_event.is_set():
+                        break
+
+                    # Reactive Timestamping: Lấy thời gian độc lập ngay khi node vừa trả kết quả về
+                    now = time.time()
+
+                    # 🧱 LAYER 2 ERROR BOUNDARY: Cách ly hoàn toàn lỗi logic xử lý giữa các node riêng biệt
+                    try:
+                        alerts, next_state = tick(
+                            raw_data=raw_data,
+                            past_state=state_registry[host],
+                            current_time=now,
+                            thresholds=current_thresholds,
+                            cooldown_seconds=cooldown_seconds,
+                        )
+                        state_registry[host] = next_state
+                        for alert in alerts:
+                            emit_alert(host, alert)
+                    except Exception as bug:
+                        logging.critical(
+                            f"💥 [LOGIC BUG] Lỗi xử lý dữ liệu cho node {host}: {bug}", exc_info=True
+                        )
+            finally:
+                # Cancel tasks chưa hoàn thành (tránh orphaned coroutines sau khi stop_event fire)
+                orphaned = [t for t in tasks if not t.done()]
+                for t in orphaned:
+                    t.cancel()
+                if orphaned:
+                    await asyncio.gather(*orphaned, return_exceptions=True)
+
             # Chờ chu kỳ tiếp theo hoặc thoát ra nếu nhận tín hiệu dừng hệ thống
             try:
                 await asyncio.wait_for(_stop_event.wait(), timeout=interval_seconds)
