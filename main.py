@@ -6,6 +6,7 @@ import signal
 import asyncio
 import asyncssh
 import ipaddress
+from dataclasses import dataclass, asdict
 from typing import Dict, Any, List, Set, Tuple
 
 # Import tầng xử lý logic và cấu trúc dữ liệu dùng chung
@@ -24,10 +25,23 @@ logging.basicConfig(
     ]
 )
 
-# Outer Watchdog: phải lớn hơn tổng inner timeouts (connect_timeout=3 + SSH command timeout=3 = 6s).
-# Buffer 4s bảo toàn error taxonomy: asyncssh.Error/OSError nổ trước → safe_poll_node phân loại đúng.
-# Nếu outer == inner: race condition khiến asyncio.TimeoutError cướp trước, mất thông tin lỗi chi tiết.
+# Outer Watchdog: lớn hơn tổng bộ đếm inner timeouts (3s connect + 3s cmd = 6s). Buffer 4s bảo toàn error taxonomy.
 POLL_TIMEOUT_SECONDS = 10
+
+# ==============================================================================
+# 0. TẦNG OBSERVABILITY (INTERNAL METRICS LAYER)
+# ==============================================================================
+@dataclass
+class DaemonStats:
+    """Container lưu trữ số liệu động phục vụ giám sát nội tại của Engine."""
+    cycle_count: int = 0
+    orphaned_cancel_count: int = 0
+    sighup_count: int = 0
+    timeout_node_count: int = 0
+    alert_count: int = 0
+
+# Khởi tạo instance duy nhất tại module-level để chia sẻ an toàn giữa Event Loop và Signal Handlers
+STATS = DaemonStats()
 
 # ==============================================================================
 # 1. TẦNG CONFIGURATION LOADER (FAIL-FAST)
@@ -97,7 +111,6 @@ async def poll_node(host: str, username: str = "admin", password: str = "admin")
         logging.info(f"🚀 [SSH] Kết nối thành công! Đang chạy lệnh trên node: {host}...")
         result = await conn.run(CONTROL_CMD, timeout=3)
         logging.info(f"📄 [SSH] Nhận được output thô dài {len(result.stdout)} ký tự từ {host}")
-
         return parse_control_output(result.stdout)
 
 
@@ -135,12 +148,11 @@ async def safe_poll_node(host: str) -> Dict[str, Any]:
 # 2.5. MODULE-LEVEL TRANSPORT WRAPPER + FLEET RELOAD HELPER
 # ==============================================================================
 async def _wrapped_poll(host_str: str, timeout: float = POLL_TIMEOUT_SECONDS) -> Tuple[str, Dict[str, Any]]:
-    """Outer watchdog cho safe_poll_node: bounds per-node với asyncio.wait_for, luôn trả (host, data).
-    TimeoutError path trả status='timeout' để downstream phân biệt với transport error / data error.
-    """
+    """Outer watchdog cho safe_poll_node: bounds per-node với asyncio.wait_for, luôn trả (host, data)."""
     try:
         data = await asyncio.wait_for(safe_poll_node(host_str), timeout=timeout)
     except asyncio.TimeoutError:
+        STATS.timeout_node_count += 1
         logging.warning(
             f"⏱️  [POLL TIMEOUT] Node {host_str} không phản hồi sau {timeout}s — dùng fallback timeout."
         )
@@ -157,9 +169,7 @@ def _apply_node_reload(
     new_nodes: List[str],
     current_registry: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Pure function: merge new node list với current state registry.
-    Preserved: state cho node còn trong list. Fresh: node mới. Dropped: node bị xóa.
-    """
+    """Pure function: merge new node list với current state registry."""
     return {h: current_registry.get(h, SystemAlertState()) for h in new_nodes}
 
 
@@ -199,15 +209,23 @@ async def main_loop(
     nodes_path: str = "nodes.json",
     poll_timeout: float = POLL_TIMEOUT_SECONDS,
 ):
-    """Vòng lặp chính điều phối xử lý theo mô hình Reactive (Xong node nào, xử lý real-time node đó)."""
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 43)...")
+    """Vòng lặp chính điều phối xử lý theo mô hình Reactive và quản lý bẫy tín hiệu."""
+    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 44)...")
 
     _stop_event = asyncio.Event()
     _reload_event = asyncio.Event()
     loop = asyncio.get_running_loop()
+
+    # SIGNAL TAXONOMY: Đăng ký định tuyến hành vi rõ ràng cho từng loại tín hiệu hệ thống
     loop.add_signal_handler(signal.SIGTERM, lambda: _stop_event.set())
     loop.add_signal_handler(signal.SIGINT, lambda: _stop_event.set())
     loop.add_signal_handler(signal.SIGHUP, lambda: _reload_event.set())
+
+    # SIGUSR1 HANDLER: On-demand telemetry dump, chuyển hóa cấu trúc dữ liệu sang Inline JSON
+    loop.add_signal_handler(
+        signal.SIGUSR1,
+        lambda: logging.info(f"📊 [STATS DUMP] {json.dumps(asdict(STATS))}")
+    )
 
     try:
         current_thresholds = load_thresholds(config_path)
@@ -222,9 +240,10 @@ async def main_loop(
 
     try:
         while not _stop_event.is_set():
-            # --- SIGHUP: hot-reload fleet list & thresholds ---
+            # --- SIGHUP: Hot-reload fleet list & thresholds ---
             if _reload_event.is_set():
                 _reload_event.clear()
+                STATS.sighup_count += 1
                 try:
                     try:
                         current_thresholds = load_thresholds(config_path)
@@ -238,17 +257,14 @@ async def main_loop(
                 except Exception as err:
                     logging.error(f"❌ [SIGHUP] Reload danh sách node thất bại, giữ nguyên fleet cũ: {err}")
 
-            logging.info(f"--- 🔄 Bắt đầu chu kỳ quét mới trên toàn bộ {len(nodes)} nodes ---")
+            STATS.cycle_count += 1
+            logging.info(f"--- 🔄 Bắt đầu chu kỳ quét mới [#{STATS.cycle_count}] trên toàn bộ {len(nodes)} nodes ---")
 
-            # Fan-out: set thay list → O(1) discard thay O(n) remove
             tasks: Set[asyncio.Task] = {asyncio.create_task(_wrapped_poll(host, poll_timeout)) for host in nodes}
-
-            # stop_task sống trong cùng set — không cần tasks+[stop_task] mỗi vòng
             stop_task = asyncio.create_task(_stop_event.wait())
             tasks.add(stop_task)
 
             try:
-                # len > 1 vì stop_task luôn ở trong set cho đến cuối chu kỳ
                 while len(tasks) > 1 and not _stop_event.is_set():
                     done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
@@ -272,6 +288,8 @@ async def main_loop(
                                     cooldown_seconds=cooldown_seconds,
                                 )
                                 state_registry[host] = next_state
+                                if alerts:
+                                    STATS.alert_count += len(alerts)
                                 for alert in alerts:
                                     emit_alert(host, alert)
                             except Exception as bug:
@@ -279,7 +297,6 @@ async def main_loop(
                                     f"💥 [LOGIC BUG] Lỗi xử lý dữ liệu cho node {host}: {bug}", exc_info=True
                                 )
             finally:
-                # Tách stop_task ra trước khi tính orphaned — stop_task không phải network task
                 tasks.discard(stop_task)
                 if not stop_task.done():
                     stop_task.cancel()
@@ -289,16 +306,18 @@ async def main_loop(
                         pass
 
                 orphaned = [t for t in tasks if not t.done()]
+                if orphaned:
+                    STATS.orphaned_cancel_count += len(orphaned)
+                    logging.info(f"🧹 Đang giải phóng {len(orphaned)} tác vụ mạng đang chạy ngầm...")
                 for t in orphaned:
                     t.cancel()
                 if orphaned:
-                    logging.info(f"🧹 Đang giải phóng {len(orphaned)} tác vụ mạng đang chạy ngầm...")
                     await asyncio.gather(*orphaned, return_exceptions=True)
 
             if _stop_event.is_set():
                 break
 
-            # --- Reactive Sleep: ngắt ngay khi có SIGHUP hoặc SIGTERM/SIGINT ---
+            # --- Reactive Sleep Phase ---
             sleep_task = asyncio.create_task(asyncio.sleep(interval_seconds))
             stop_task_sleep = asyncio.create_task(_stop_event.wait())
             reload_task = asyncio.create_task(_reload_event.wait())
@@ -323,7 +342,6 @@ async def main_loop(
         logging.info("🛑 SR Linux Monitor daemon đã dừng sạch sẽ. Exit code 0.")
 
 
-# Hằng số tương thích ngược nếu cần
 DEFAULT_THRESHOLDS = {"cpu": 80, "memory": 25, "temperature": 75}
 
 if __name__ == "__main__":
