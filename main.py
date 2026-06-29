@@ -28,8 +28,13 @@ logging.basicConfig(
 # Outer Watchdog: lớn hơn tổng bộ đếm inner timeouts (3s connect + 3s cmd = 6s). Buffer 4s bảo toàn error taxonomy.
 POLL_TIMEOUT_SECONDS = 10
 
-# Các trạng thái lỗi do safe_poll_node và _wrapped_poll inject — chỉ những status này mới bị filter
-_INFRA_ERROR_STATUSES = frozenset({"unreachable", "bad_data", "error", "timeout"})
+# ALLOWLIST INFRA STATUSES: Chỉ intercept lọc bỏ nếu khớp chính xác các trạng thái lỗi hạ tầng dưới đây.
+# Sử dụng frozenset nhằm đảm bảo tính bất biến (immutable) và tối ưu hóa lookup O(1).
+_INFRA_ERROR_STATUSES = frozenset({"unreachable", "bad_data", "timeout", "error"})
+
+# Hằng số cấu hình tương thích ngược mặc định cho hệ thống
+DEFAULT_THRESHOLDS = {"cpu": 80, "memory": 25, "temperature": 75}
+
 
 # ==============================================================================
 # 0. TẦNG OBSERVABILITY (INTERNAL METRICS LAYER)
@@ -45,6 +50,7 @@ class DaemonStats:
 
 # Khởi tạo instance duy nhất tại module-level để chia sẻ an toàn giữa Event Loop và Signal Handlers
 STATS = DaemonStats()
+
 
 # ==============================================================================
 # 1. TẦNG CONFIGURATION LOADER (FAIL-FAST)
@@ -213,7 +219,7 @@ async def main_loop(
     poll_timeout: float = POLL_TIMEOUT_SECONDS,
 ):
     """Vòng lặp chính điều phối xử lý theo mô hình Reactive và quản lý bẫy tín hiệu."""
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 45)...")
+    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 46)...")
 
     _stop_event = asyncio.Event()
     _reload_event = asyncio.Event()
@@ -224,7 +230,7 @@ async def main_loop(
     loop.add_signal_handler(signal.SIGINT, lambda: _stop_event.set())
     loop.add_signal_handler(signal.SIGHUP, lambda: _reload_event.set())
 
-    # SIGUSR1 HANDLER: On-demand telemetry dump dạng Inline JSON
+    # SIGUSR1 HANDLER: On-demand telemetry dump dạng Inline JSON phục vụ giám sát
     loop.add_signal_handler(
         signal.SIGUSR1,
         lambda: logging.info(f"📊 [STATS DUMP] {json.dumps(asdict(STATS))}")
@@ -276,21 +282,29 @@ async def main_loop(
                         break
 
                     for fut in done:
+                        # ==============================================================================
+                        # GUARD CHECKLIST: KHÔNG ĐƯỢC DROP BLOCK NÀY TRONG CÁC LẦN REFACTOR TIẾP THEO
+                        # 1. `fut is not stop_task`: identity check — tránh xử lý nhầm stop_task là network task.
+                        # 2. `tasks.discard(fut)`: O(1) removal từ set — discard (không phải remove) để tránh
+                        #    KeyError nếu invariant asyncio.wait bị vi phạm do bug trong tương lai.
+                        # ==============================================================================
                         if fut is not stop_task:
                             tasks.discard(fut)
+
                             host, raw_data = fut.result()
                             now = time.time()
 
-                            # INFRASTRUCTURE FILTER GUARD: bỏ qua node lỗi để bảo toàn cooldown state cũ
-                            healthz = raw_data.get("healthz")
+                            # INFRASTRUCTURE FILTER GUARD: Dùng allowlist để lọc lỗi, chặn dữ liệu hỏng
+                            # lọt xuống core làm reset cooldown bừa bãi
+                            healthz = raw_data.get("healthz") if isinstance(raw_data, dict) else None
                             if healthz and healthz.get("status") in _INFRA_ERROR_STATUSES:
                                 logging.warning(
-                                    f"⚠️ [{host}] Bỏ qua phân tích metrics chu kỳ này do lỗi hạ tầng: "
-                                    f"{healthz['status']} - {healthz.get('reason', 'unknown')}"
+                                    f"⚠️ [{host}] Bỏ qua phân tích chu kỳ này do lỗi hạ tầng: "
+                                    f"status='{healthz.get('status')}', reason='{healthz.get('reason', 'unknown')}'"
                                 )
                                 continue
 
-                            # 🧱 LAYER 2 ERROR BOUNDARY
+                            # 🧱 LAYER 2 ERROR BOUNDARY: Gọi tầng Core xử lý logic thuần túy
                             try:
                                 alerts, next_state = tick(
                                     raw_data=raw_data,
@@ -353,8 +367,6 @@ async def main_loop(
         _stop_event.set()
         logging.info("🛑 SR Linux Monitor daemon đã dừng sạch sẽ. Exit code 0.")
 
-
-DEFAULT_THRESHOLDS = {"cpu": 80, "memory": 25, "temperature": 75}
 
 if __name__ == "__main__":
     target_config = sys.argv[1] if len(sys.argv) > 1 else "thresholds.json"
