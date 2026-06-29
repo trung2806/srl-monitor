@@ -25,6 +25,11 @@ logging.basicConfig(
     ]
 )
 
+# ==============================================================================
+# CONFIGURATION & METADATA CONSTANTS (SINGLE SOURCE OF TRUTH)
+# ==============================================================================
+_DAEMON_VERSION = "Day 47"
+
 # Outer Watchdog: lớn hơn tổng bộ đếm inner timeouts (3s connect + 3s cmd = 6s). Buffer 4s bảo toàn error taxonomy.
 POLL_TIMEOUT_SECONDS = 10
 
@@ -219,7 +224,7 @@ async def main_loop(
     poll_timeout: float = POLL_TIMEOUT_SECONDS,
 ):
     """Vòng lặp chính điều phối xử lý theo mô hình Reactive và quản lý bẫy tín hiệu."""
-    logging.info("🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet (Day 46)...")
+    logging.info(f"🚀 Khởi động hệ thống giám sát SR Linux Monitor Fleet ({_DAEMON_VERSION})...")
 
     _stop_event = asyncio.Event()
     _reload_event = asyncio.Event()
@@ -294,8 +299,6 @@ async def main_loop(
                             host, raw_data = fut.result()
                             now = time.time()
 
-                            # INFRASTRUCTURE FILTER GUARD: Dùng allowlist để lọc lỗi, chặn dữ liệu hỏng
-                            # lọt xuống core làm reset cooldown bừa bãi
                             healthz = raw_data.get("healthz") if isinstance(raw_data, dict) else None
                             if healthz and healthz.get("status") in _INFRA_ERROR_STATUSES:
                                 logging.warning(
@@ -304,7 +307,6 @@ async def main_loop(
                                 )
                                 continue
 
-                            # 🧱 LAYER 2 ERROR BOUNDARY: Gọi tầng Core xử lý logic thuần túy
                             try:
                                 alerts, next_state = tick(
                                     raw_data=raw_data,
@@ -343,7 +345,6 @@ async def main_loop(
             if _stop_event.is_set():
                 break
 
-            # --- Reactive Sleep Phase ---
             sleep_task = asyncio.create_task(asyncio.sleep(interval_seconds))
             stop_task_sleep = asyncio.create_task(_stop_event.wait())
             reload_task = asyncio.create_task(_reload_event.wait())
